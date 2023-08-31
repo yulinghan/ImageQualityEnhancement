@@ -6,46 +6,12 @@ MyMtbTest::MyMtbTest() {
 MyMtbTest::~MyMtbTest() {
 }
 
-Mat MyMtbTest::SparseBlur(Mat src, int sparseFactor) {
-    int winSize = 2 * sparseFactor + 3;
-    int boundary = (winSize - 1) / 2;
-    Mat dst = Mat::zeros(src.size(), src.type());
-    for (int i = boundary; i < src.rows - boundary; i++) {
-        const uchar* lastData = src.ptr<uchar>(i - 1 - sparseFactor);
-        const uchar* curData = src.ptr<uchar>(i);
-        const uchar* nextData = src.ptr<uchar>(i + 1 + sparseFactor);
-        uchar* outData = dst.ptr<uchar>(i);
-        for (int j = boundary; j < src.cols - boundary; j++) {
-            outData[j] = (lastData[j - 1 - sparseFactor] + 2 * lastData[j] + lastData[j + 1 + sparseFactor] +
-                    2 * curData[j - 1 - sparseFactor] + 4 * curData[j] + 2 * curData[j + 1 + sparseFactor] +
-                    nextData[j - 1 - sparseFactor] + 2 * nextData[j] + nextData[j + 1 + sparseFactor]) / 16;
-        }
-    }
-    return dst;
-}
-
-void MyMtbTest::Downsample(Mat& src, Mat& dst) {
-    dst = Mat(src.rows / 2, src.cols / 2, CV_8UC1);
-
-    int offset = src.cols * 2;
-    uchar *src_ptr = src.ptr();
-    uchar *dst_ptr = dst.ptr();
-    for (int y = 0; y < dst.rows; y++) {
-        uchar *ptr = src_ptr;
-        for (int x = 0; x < dst.cols; x++) {
-            dst_ptr[0] = ptr[0];
-            dst_ptr++;
-            ptr += 2;
-        }
-        src_ptr += offset;
-    }
-}
-
 void MyMtbTest::BuildPyr(const Mat& img, std::vector<Mat>& pyr) {
-    pyr.resize(max_level_ + 1);
-    pyr[0] = img.clone();
+    pyr.push_back(img.clone());
     for (int level = 0; level < max_level_; level++) {
-        Downsample(pyr[level], pyr[level + 1]);
+        Mat cur_mat;
+        resize(pyr[level], cur_mat, pyr[level].size()/2);
+        pyr.push_back(cur_mat);
     }
 }
 
@@ -105,10 +71,9 @@ Point MyMtbTest::CalculateShift(const Mat& img, const vector<Mat> tbRef, const R
     Point shift(0, 0);
 
     Mat imgROI = img(ROI);
-    Mat imgROIblur = SparseBlur(imgROI, 3);
-    GaussianBlur(imgROIblur, imgROIblur, Size(3,3), 0);
+    GaussianBlur(imgROI, imgROI, Size(3,3), 0);
     vector<Mat> pyr;
-    BuildPyr(imgROIblur, pyr);
+    BuildPyr(imgROI, pyr);
 
     for (int level = max_level_; level >= 1; level--) {
         int levelRef = max_level_ - level;
@@ -123,53 +88,27 @@ Point MyMtbTest::CalculateShift(const Mat& img, const vector<Mat> tbRef, const R
         Point test_shift[9] = { point0, point0, point0, point0, point0, point0, point0, point0, point0 };
         int min_ID = 0;
 
-        if (level == 1) {
-            int err[5];
-            for (int i = 0; i < 5; i++) {
-                test_shift[i] = shift + points[i];
-                Mat diff;
-                int width = tbRef[levelRef].cols - abs(test_shift[i].x);
-                int height = tbRef[levelRef].rows - abs(test_shift[i].y);
-                Rect dst_rect(max(test_shift[i].x, 0), max(test_shift[i].y, 0), width, height);
-                Rect src_rect(max(-test_shift[i].x, 0), max(-test_shift[i].y, 0), width, height);
-                bitwise_xor(tbRef[levelRef](src_rect), tbImg(dst_rect), diff);
-                err[i] = countNonZero(diff);
+        int err[9];
+        for (int i = 0; i < 9; i++) {
+            test_shift[i] = shift + points[i];
+            Mat diff;
+            int width = tbRef[levelRef].cols - abs(test_shift[i].x);
+            int height = tbRef[levelRef].rows - abs(test_shift[i].y);
+            Rect dst_rect(max(test_shift[i].x, 0), max(test_shift[i].y, 0), width, height);
+            Rect src_rect(max(-test_shift[i].x, 0), max(-test_shift[i].y, 0), width, height);
+            bitwise_xor(tbRef[levelRef](src_rect), tbImg(dst_rect), diff);
+            err[i] = countNonZero(diff);
+        }
+        int min_err = err[0];
+        for (int i = 1; i < 9; i++) {
+            if (err[i] < min_err) {
+                min_err = err[i];
             }
-            int min_err = err[0];
-            for (int i = 1; i < 5; i++) {
-                if (err[i] < min_err) {
-                    min_err = err[i];
-                }
-            }
-            for (int i = 1; i < 5; i++) {
-                if (err[i] == min_err) {
-                    min_ID = i;
-                    break;
-                }
-            }
-        } else {
-            int err[9];
-            for (int i = 0; i < 9; i++) {
-                test_shift[i] = shift + points[i];
-                Mat diff;
-                int width = tbRef[levelRef].cols - abs(test_shift[i].x);
-                int height = tbRef[levelRef].rows - abs(test_shift[i].y);
-                Rect dst_rect(max(test_shift[i].x, 0), max(test_shift[i].y, 0), width, height);
-                Rect src_rect(max(-test_shift[i].x, 0), max(-test_shift[i].y, 0), width, height);
-                bitwise_xor(tbRef[levelRef](src_rect), tbImg(dst_rect), diff);
-                err[i] = countNonZero(diff);
-            }
-            int min_err = err[0];
-            for (int i = 1; i < 9; i++) {
-                if (err[i] < min_err) {
-                    min_err = err[i];
-                }
-            }
-            for (int i = 1; i < 9; i++) {
-                if (err[i] == min_err) {
-                    min_ID = i;
-                    break;
-                }
+        }
+        for (int i = 1; i < 9; i++) {
+            if (err[i] == min_err) {
+                min_ID = i;
+                break;
             }
         }
 
@@ -190,10 +129,9 @@ Mat MyMtbTest::Run(Mat input, Mat ref) {
     int rows = ref.rows, cols = ref.cols;
     Rect ROI((cols - roi_length_) / 2, (rows - roi_length_) / 2, roi_length_, roi_length_);
     Mat refROI = ref(ROI);
-    Mat refROIblur = SparseBlur(refROI, 3);
-    GaussianBlur(refROIblur, refROIblur, Size(3,3), 0);
+    GaussianBlur(refROI, refROI, Size(3,3), 0);
     vector<Mat> tbRef, pyrRef;
-    BuildPyr(refROIblur, pyrRef);
+    BuildPyr(refROI, pyrRef);
     for (int level = max_level_; level >= 1; level--) {
         Mat tb;
         ComputeBitmaps(pyrRef[level], tb);

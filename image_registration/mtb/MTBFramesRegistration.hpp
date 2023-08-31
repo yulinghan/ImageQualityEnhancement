@@ -21,8 +21,6 @@ class MyMtbTest{
         MyMtbTest();
         ~MyMtbTest();
 
-        Mat SparseBlur(Mat src, int sparseFactor);
-        void Downsample(Mat& src, Mat& dst);
         void BuildPyr(const Mat& img, std::vector<Mat>& pyr);
         int GetAverage(Mat& img);
         int GetMedian(Mat& img);
