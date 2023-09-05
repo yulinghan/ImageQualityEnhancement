@@ -430,6 +430,33 @@ Mat detailEnhancement(Mat &myGFilter, Mat &src){
 	return src;
 }
 
+
+Mat colorAdjust(Mat src, Mat out){
+    src.convertTo(src, CV_32F);
+    out.convertTo(out, CV_32F);
+
+    vector<Mat> channels;
+    split(src, channels);
+    Mat weight = (out+1.0) / (channels[0]+1.0);
+
+    channels[0] = out;
+    merge(channels, src);
+    src.convertTo(src, CV_8U);
+
+	cvtColor(src, src, COLOR_YUV2BGR);
+	cvtColor(src, src, COLOR_BGR2HSV);
+    vector<Mat> hsv_channels;
+    split(src, hsv_channels);
+
+    hsv_channels[1].convertTo(hsv_channels[1], CV_32FC1);
+    hsv_channels[1] = hsv_channels[1].mul(weight);
+    hsv_channels[1].convertTo(hsv_channels[1], CV_8UC1);
+    merge(hsv_channels, out);
+	cvtColor(out, out, COLOR_HSV2BGR);
+    
+    return out;
+}
+
 int main(int argc, char* argv[]){
 	int k;
 
@@ -469,20 +496,15 @@ int main(int argc, char* argv[]){
 	split(mySrc, channels);
 
 /***********对Y通道gamma调整*******************/
-	channels[0] = S_curve(channels[0]);
+	Mat new_y = S_curve(channels[0]);
 
 /*************细节增强*************************/
 	Mat myGFilter;
-	GaussianBlur(channels[0], myGFilter, Size(5,5), 0, 0);
-	channels[0] = detailEnhancement(myGFilter, channels[0]);
+	GaussianBlur(new_y, myGFilter, Size(5,5), 0, 0);
+	new_y = detailEnhancement(myGFilter, new_y);
 
-/*****************颜色调整*********************/
-
-
-	Mat out;
-
-	merge(channels, out);
-	cvtColor(out, out, COLOR_YUV2BGR);
+/*****************颜色调整*********************/  
+    Mat out = colorAdjust(mySrc, new_y);
 
 	imwrite(argv[2], out);
 
