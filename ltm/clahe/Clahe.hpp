@@ -1,6 +1,3 @@
-#ifndef _MTBFramesRegistration__H_
-#define _MTBFramesRegistration__H_
-
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/opencv.hpp>
@@ -29,4 +26,3 @@ class MyClaheTest{
 		Mat GetAdjustMat(Mat src, vector<vector<float>> hist_arr, int width_block, int height_block, int step);
 
 };
-#endif
