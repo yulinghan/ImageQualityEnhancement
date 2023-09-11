@@ -2,19 +2,11 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include "vector"
-#include "time.h"
-
-#define elif else if
-#define ATD at<double>
-#define vector vector<Mat>
 
 using namespace cv;
 using namespace std;
 
-//calculate horizontal gradient, img(i,j+1) - img(i,j)
-Mat getGradientXp(Mat &img)
-{
+Mat getGradientXp(Mat &img) {
 	int height = img.rows;
 	int width = img.cols;
 	Mat cat = repeat(img, 1, 2);
@@ -56,14 +48,11 @@ Mat getGradientYn(Mat &img)
 	return roimat - img;
 }
 
-int getLabel(int i, int j, int height, int width)
-{
+int getLabel(int i, int j, int height, int width) {
 	return i * width + j;
 }
 
-//get Matrix A.
-Mat getA(int height, int width)
-{
+Mat getA(int height, int width) {
 	Mat A = Mat::eye(height*width, height*width, CV_64FC1);
 	A *= -4;
 	Mat M = Mat::zeros(height, width, CV_64FC1);
@@ -83,35 +72,35 @@ Mat getA(int height, int width)
 	for(int i=0; i<height; i++){
 		for(int j=0; j<width; j++){
 			int label = getLabel(i, j, height, width);
-			if(M.ATD(i, j) == 0){
-				if(i == 0)  A.ATD(getLabel(i + 1, j, height, width), label) = 1;
-				elif(i == height - 1)   A.ATD(getLabel(i - 1, j, height, width), label) = 1;
-				if(j == 0)  A.ATD(getLabel(i, j + 1, height, width), label) = 1;
-				elif(j == width - 1)   A.ATD(getLabel(i, j - 1, height, width), label) = 1;
-			}elif(M.ATD(i, j) == 1){
+			if(M.at<double>(i, j) == 0){
+				if(i == 0)  A.at<double>(getLabel(i + 1, j, height, width), label) = 1;
+				else if(i == height - 1)   A.at<double>(getLabel(i - 1, j, height, width), label) = 1;
+				if(j == 0)  A.at<double>(getLabel(i, j + 1, height, width), label) = 1;
+				else if(j == width - 1)   A.at<double>(getLabel(i, j - 1, height, width), label) = 1;
+			}else if(M.at<double>(i, j) == 1){
 				if(i == 0){
-					A.ATD(getLabel(i + 1, j, height, width), label) = 1;
-					A.ATD(getLabel(i, j - 1, height, width), label) = 1;
-					A.ATD(getLabel(i, j + 1, height, width), label) = 1;
-				}elif(i == height - 1){
-					A.ATD(getLabel(i - 1, j, height, width), label) = 1;
-					A.ATD(getLabel(i, j - 1, height, width), label) = 1;
-					A.ATD(getLabel(i, j + 1, height, width), label) = 1;
+					A.at<double>(getLabel(i + 1, j, height, width), label) = 1;
+					A.at<double>(getLabel(i, j - 1, height, width), label) = 1;
+					A.at<double>(getLabel(i, j + 1, height, width), label) = 1;
+				}else if(i == height - 1){
+					A.at<double>(getLabel(i - 1, j, height, width), label) = 1;
+					A.at<double>(getLabel(i, j - 1, height, width), label) = 1;
+					A.at<double>(getLabel(i, j + 1, height, width), label) = 1;
 				}
 				if(j == 0){
-					A.ATD(getLabel(i, j + 1, height, width), label) = 1;
-					A.ATD(getLabel(i - 1, j, height, width), label) = 1;
-					A.ATD(getLabel(i + 1, j, height, width), label) = 1;
-				}elif(j == width - 1){
-					A.ATD(getLabel(i, j - 1, height, width), label) = 1;
-					A.ATD(getLabel(i - 1, j, height, width), label) = 1;
-					A.ATD(getLabel(i + 1, j, height, width), label) = 1;
+					A.at<double>(getLabel(i, j + 1, height, width), label) = 1;
+					A.at<double>(getLabel(i - 1, j, height, width), label) = 1;
+					A.at<double>(getLabel(i + 1, j, height, width), label) = 1;
+				}else if(j == width - 1){
+					A.at<double>(getLabel(i, j - 1, height, width), label) = 1;
+					A.at<double>(getLabel(i - 1, j, height, width), label) = 1;
+					A.at<double>(getLabel(i + 1, j, height, width), label) = 1;
 				}
 			}else{
-				A.ATD(getLabel(i, j - 1, height, width), label) = 1;
-				A.ATD(getLabel(i, j + 1, height, width), label) = 1;
-				A.ATD(getLabel(i - 1, j, height, width), label) = 1;
-				A.ATD(getLabel(i + 1, j, height, width), label) = 1;
+				A.at<double>(getLabel(i, j - 1, height, width), label) = 1;
+				A.at<double>(getLabel(i, j + 1, height, width), label) = 1;
+				A.at<double>(getLabel(i - 1, j, height, width), label) = 1;
+				A.at<double>(getLabel(i + 1, j, height, width), label) = 1;
 			}
 		}
 	}
@@ -122,19 +111,19 @@ Mat getA(int height, int width)
 // 0  1  0
 // 1 -4  1
 // 0  1  0
-Mat
-getLaplacian(){
+Mat getLaplacian(){
 	Mat laplacian = Mat::zeros(3, 3, CV_64FC1);
-	laplacian.ATD(0, 1) = 1.0;
-	laplacian.ATD(1, 0) = 1.0;
-	laplacian.ATD(1, 2) = 1.0;
-	laplacian.ATD(2, 1) = 1.0;
-	laplacian.ATD(1, 1) = -4.0; 
+	laplacian.at<double>(0, 1) = 1.0;
+	laplacian.at<double>(1, 0) = 1.0;
+	laplacian.at<double>(1, 2) = 1.0;
+	laplacian.at<double>(2, 1) = 1.0;
+	laplacian.at<double>(1, 1) = -4.0; 
 	return laplacian;
 }
+
 // Calculate b
 // using convolution.
-Mat getB1(Mat &img1, Mat &img2, int posX, int posY, Rect ROI){
+Mat getB(Mat &img1, Mat &img2, int posX, int posY, Rect ROI){
 	Mat Lap;
 	filter2D(img1, Lap, -1, getLaplacian());
 	int roiheight = ROI.height;
@@ -143,33 +132,12 @@ Mat getB1(Mat &img1, Mat &img2, int posX, int posY, Rect ROI){
 	for(int i=0; i<roiheight; i++){
 		for(int j=0; j<roiwidth; j++){
 			double temp = 0.0;
-			temp += Lap.ATD(i + ROI.y, j + ROI.x);
-			if(i == 0)              temp -= img2.ATD(i - 1 + posY, j + posX);
-			if(i == roiheight - 1)  temp -= img2.ATD(i + 1 + posY, j + posX);
-			if(j == 0)              temp -= img2.ATD(i + posY, j - 1 + posX);
-			if(j == roiwidth - 1)   temp -= img2.ATD(i + posY, j + 1 + posX);
-			B.ATD(getLabel(i, j, roiheight, roiwidth), 0) = temp;
-		}
-	}
-	return B;
-}
-
-// Calculate b
-// using getGradient functions.
-Mat getB2(Mat &img1, Mat &img2, int posX, int posY, Rect ROI){
-	Mat grad = getGradientXp(img1) + getGradientYp(img1) + getGradientXn(img1) + getGradientYn(img1);
-	int roiheight = ROI.height;
-	int roiwidth = ROI.width;
-	Mat B = Mat::zeros(roiheight * roiwidth, 1, CV_64FC1);
-	for(int i=0; i<roiheight; i++){
-		for(int j=0; j<roiwidth; j++){
-			double temp = 0.0;
-			temp += grad.ATD(i + ROI.y, j + ROI.x);
-			if(i == 0)              temp -= img2.ATD(i - 1 + posY, j + posX);
-			if(i == roiheight - 1)  temp -= img2.ATD(i + 1 + posY, j + posX);
-			if(j == 0)              temp -= img2.ATD(i + posY, j - 1 + posX);
-			if(j == roiwidth - 1)   temp -= img2.ATD(i + posY, j + 1 + posX);
-			B.ATD(getLabel(i, j, roiheight, roiwidth), 0) = temp;
+			temp += Lap.at<double>(i + ROI.y, j + ROI.x);
+			if(i == 0)              temp -= img2.at<double>(i - 1 + posY, j + posX);
+			if(i == roiheight - 1)  temp -= img2.at<double>(i + 1 + posY, j + posX);
+			if(j == 0)              temp -= img2.at<double>(i + posY, j - 1 + posX);
+			if(j == roiwidth - 1)   temp -= img2.at<double>(i + posY, j + 1 + posX);
+			B.at<double>(getLabel(i, j, roiheight, roiwidth), 0) = temp;
 		}
 	}
 	return B;
@@ -187,39 +155,30 @@ Mat getResult(Mat &A, Mat &B, Rect &ROI){
 // img2: 3-channel image, dst image.
 // ROI: the position and size of the block we want to move in img1.
 // posX, posY: where we want to move the block to in img2
-Mat
-poisson_blending(Mat &img1, Mat &img2, Rect ROI, int posX, int posY){
-
+Mat poisson_blending(Mat &img1, Mat &img2, Rect ROI, int posX, int posY){
 	int roiheight = ROI.height;
 	int roiwidth = ROI.width;
 	Mat A = getA(roiheight, roiwidth);
 
-	// we must do the poisson blending to each channel.
-	vector rgb1;
+	vector<Mat> rgb1, rgb2;
 	split(img1, rgb1);
-	vector rgb2;
 	split(img2, rgb2);
 
-	vector result;
+	vector<Mat> result;
 	Mat merged, res, Br, Bg, Bb;
-	// For calculating B, you can use either getB1() or getB2()
-	Br = getB2(rgb1[0], rgb2[0], posX, posY, ROI);
-	//Br = getB2(rgb1[0], rgb2[0], posX, posY, ROI);
+
+	Br = getB(rgb1[0], rgb2[0], posX, posY, ROI);
 	res = getResult(A, Br, ROI);
 	result.push_back(res);
-	cout<<"R channel finished..."<<endl;
-	Bg = getB2(rgb1[1], rgb2[1], posX, posY, ROI);
-	//Bg = getB2(rgb1[1], rgb2[1], posX, posY, ROI);
+
+	Bg = getB(rgb1[1], rgb2[1], posX, posY, ROI);
 	res = getResult(A, Bg, ROI);
 	result.push_back(res);
-	cout<<"G channel finished..."<<endl;
-	Bb = getB2(rgb1[2], rgb2[2], posX, posY, ROI);
-	//Bb = getB2(rgb1[2], rgb2[2], posX, posY, ROI);
+
+	Bb = getB(rgb1[2], rgb2[2], posX, posY, ROI);
 	res = getResult(A, Bb, ROI);
 	result.push_back(res);
-	cout<<"B channel finished..."<<endl;
 
-	// merge the 3 gray images into a 3-channel image 
 	merge(result,merged);
 	return merged; 
 }
