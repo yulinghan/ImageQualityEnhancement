@@ -10,6 +10,10 @@ Mat MyAlphaTest::Run(Mat src1, Mat src2, Mat mask) {
 	Mat out = Mat::zeros(src1.size(), src1.type());
 	int channels = src1.channels();
 
+	Mat tmp_y;
+	cvtColor(src1, tmp_y, COLOR_BGR2GRAY);
+	ximgproc::guidedFilter(tmp_y, mask, mask, 17, 500, -1);
+
 	for(int i=0; i<src1.rows; i++) {
 		uchar *ptr_src1 = src1.ptr(i);
 		uchar *ptr_src2 = src2.ptr(i);

@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <opencv2/ximgproc.hpp>
 
 using namespace cv;
 using namespace std;
