@@ -25,8 +25,7 @@ void MyPoissonFusionTest::computeGradientY(Mat img, Mat &gy) {
 
     if(img.channels() == 3) {
         filter2D(img, gy, CV_32F, kernel);
-    } else if (img.channels() == 1) {
-       
+    } else if (img.channels() == 1) {      
         filter2D(img, gy, CV_32F, kernel);
     }
 }
@@ -83,7 +82,7 @@ void MyPoissonFusionTest::dst(const cv::Mat& src, Mat& dest, bool invert) {
     split(complex, planes2);
 
     temp = planes2[1].t();
-    temp(Rect( 0, 1, src.cols, src.rows)).copyTo(dest);
+    temp(Rect(0, 1, src.cols, src.rows)).copyTo(dest);
 }
 
 void MyPoissonFusionTest::solve(Mat &img, Mat& mod_diff, Mat &result) {
@@ -109,7 +108,6 @@ void MyPoissonFusionTest::solve(Mat &img, Mat& mod_diff, Mat &result) {
     float * imgLinePtr = img.ptr<float>(0);
     const float * interpLinePtr = NULL;
 
-     //first col
     for(int i = 0 ; i < w ; ++i)
         result.ptr<float>(0)[i] = img.ptr<float>(0)[i];
 
@@ -118,29 +116,22 @@ void MyPoissonFusionTest::solve(Mat &img, Mat& mod_diff, Mat &result) {
         imgLinePtr  = img.ptr<float>(j);
         interpLinePtr = mod_diff.ptr<float>(j-1);
 
-        //first row
         resLinePtr[0] = imgLinePtr[0];
 
         for(int i = 1 ; i < w-1 ; ++i) {
-            //saturate cast is not used here, because it behaves differently from the previous implementation
-            //most notable, saturate_cast rounds before truncating, here it's the opposite.
             float value = interpLinePtr[i-1];
             resLinePtr[i] = static_cast<float>(value);
         }
-
-        //last row
         resLinePtr[w-1] = imgLinePtr[w-1];
     }
 
-    //last col
     resLinePtr = result.ptr<float>(h-1);
     imgLinePtr = img.ptr<float>(h-1);
     for(int i = 0 ; i < w ; ++i)
         resLinePtr[i] = imgLinePtr[i];
 }
 
-Mat MyPoissonFusionTest::poissonSolver(Mat img, Mat laplacianX , Mat laplacianY)
-{
+Mat MyPoissonFusionTest::poissonSolver(Mat img, Mat laplacianX , Mat laplacianY) {
     int w = img.cols;
     int h = img.rows;
 
@@ -190,8 +181,8 @@ void MyPoissonFusionTest::computeDerivatives(vector<Mat> src_arr,
 
 Mat MyPoissonFusionTest::poisson(Mat destination, vector<Mat> mask_arr, 
 		vector<Mat> patchGradientX, vector<Mat> patchGradientY) {
-	Mat laplacianX = patchGradientX[0];
-	Mat laplacianY = patchGradientY[0];
+	Mat laplacianX = patchGradientX[0].clone();
+	Mat laplacianY = patchGradientY[0].clone();
 
 	for (int i = 1; i < (int)(patchGradientX.size()); i++) {
 		laplacianX += patchGradientX[i];
