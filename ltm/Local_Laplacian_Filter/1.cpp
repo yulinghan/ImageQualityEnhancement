@@ -17,15 +17,15 @@ using namespace std;
 
 int main(int argc, char* argv[]) {
     float kAlpha = 0.3;
-    float kBeta = 1.3;
+    float kBeta = 2.3;
     float kSigmaR = 0.1;
 
     Mat src = imread(argv[1], 0);
-    imwrite("ori.jpg", src);
     src.convertTo(src, CV_32FC1, 1/255.0);
  
     int desired_base_size = 30;
     int level = GetLevelCount(src.rows, src.cols, desired_base_size);
+	level = level -1;
 
     vector<Mat> gaussian_src = GaussianPyramid(src, level, 0, src.rows-1, 0, src.cols-1);
 
@@ -62,7 +62,9 @@ int main(int argc, char* argv[]) {
     }
 
     Mat out = LapReconstruct(output);
-    imwrite("final.jpg", out*255);
+	out = out * 255;
+	out.convertTo(out, CV_8UC1);
+    imwrite(argv[2], out);
 
     return 0;
 }
