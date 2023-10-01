@@ -1,0 +1,1 @@
+/usr/bin/c++  -march=native -Wall -Wextra -fopenmp -O3 -DNDEBUG -rdynamic CMakeFiles/bm3d.dir/bm3d.cpp.o CMakeFiles/bm3d.dir/iio.c.o CMakeFiles/bm3d.dir/lib_transforms.cpp.o CMakeFiles/bm3d.dir/main.cpp.o CMakeFiles/bm3d.dir/utilities.cpp.o -o bm3d  -ltiff -ljpeg -lpng -lz -lfftw3f 
