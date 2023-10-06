@@ -1,0 +1,15 @@
+torch==1.8.0
+torchvision==0.9.0
+matplotlib
+scikit-image
+yacs
+joblib 
+natsort 
+h5py 
+tqdm
+einops
+linformer
+timm
+ptflops
+dataclasses
+natsort
