@@ -13,10 +13,10 @@
 using namespace cv;
 using namespace std;
 
-class MyBilateralPyrBlurTest{
+class MyBilateralLutTest{
     public:
-        MyBilateralPyrBlurTest();
-        ~MyBilateralPyrBlurTest();
+        MyBilateralLutTest();
+        ~MyBilateralLutTest();
 
 		Mat Run(Mat src, int r, float gauss_sigma, float value_sigma);
 
@@ -24,5 +24,4 @@ class MyBilateralPyrBlurTest{
         Mat CalGaussianTemplate(int ksize, float sigma);
         vector<float> CalValueTemplate(float sigma);
         Mat BilateralBlur(Mat src, Mat gaussian_kore, vector<float> val_weight_arr, int r);
-        vector<Mat> LaplacianPyramid(Mat img, int level);
 };

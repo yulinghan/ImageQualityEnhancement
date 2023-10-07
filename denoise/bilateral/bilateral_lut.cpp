@@ -1,12 +1,12 @@
-#include "bilateral_blur.hpp"
+#include "bilateral_lut.hpp"
 
-MyBilateralBlurTest::MyBilateralBlurTest() {
+MyBilateralLutTest::MyBilateralLutTest() {
 }
 
-MyBilateralBlurTest::~MyBilateralBlurTest() {
+MyBilateralLutTest::~MyBilateralLutTest() {
 }
 
-Mat MyBilateralBlurTest::CalGaussianTemplate(int r, float sigma) {
+Mat MyBilateralLutTest::CalGaussianTemplate(int r, float sigma) {
     float pi = 3.1415926;
     int center = r;
     int ksize = r*2+1;
@@ -26,7 +26,7 @@ Mat MyBilateralBlurTest::CalGaussianTemplate(int r, float sigma) {
     return Kore;
 }
 
-vector<float> MyBilateralBlurTest::CalValueTemplate(float sigma) {
+vector<float> MyBilateralLutTest::CalValueTemplate(float sigma) {
     vector<float> val_weight_arr;
 
     for(int i=0; i<256; i++) {
@@ -37,7 +37,7 @@ vector<float> MyBilateralBlurTest::CalValueTemplate(float sigma) {
     return val_weight_arr;
 }
     
-Mat MyBilateralBlurTest::BilateralBlur(Mat src, Mat gaussian_kore, vector<float> val_weight_arr, int r) {
+Mat MyBilateralLutTest::BilateralBlur(Mat src, Mat gaussian_kore, vector<float> val_weight_arr, int r) {
     Mat out = Mat::zeros(src.size(), src.type());
 
     for (int i=r; i<src.rows-r; i++) {
@@ -59,7 +59,7 @@ Mat MyBilateralBlurTest::BilateralBlur(Mat src, Mat gaussian_kore, vector<float>
     return out;
 }
 
-Mat MyBilateralBlurTest::Run(Mat src, int r, float gauss_sigma, float value_sigma) {
+Mat MyBilateralLutTest::Run(Mat src, int r, float gauss_sigma, float value_sigma) {
     Mat gaussian_kore = CalGaussianTemplate(r, gauss_sigma);
     vector<float> val_weight_arr = CalValueTemplate(value_sigma);
 

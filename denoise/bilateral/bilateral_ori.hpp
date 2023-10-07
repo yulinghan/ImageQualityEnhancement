@@ -13,15 +13,10 @@
 using namespace cv;
 using namespace std;
 
-class MyBilateralBlurTest{
+class MyBilateralOriTest{
     public:
-        MyBilateralBlurTest();
-        ~MyBilateralBlurTest();
+        MyBilateralOriTest();
+        ~MyBilateralOriTest();
 
 		Mat Run(Mat src, int r, float gauss_sigma, float value_sigma);
-
-    private:
-        Mat CalGaussianTemplate(int ksize, float sigma);
-        vector<float> CalValueTemplate(float sigma);
-        Mat BilateralBlur(Mat src, Mat gaussian_kore, vector<float> val_weight_arr, int r);
 };

@@ -1,12 +1,12 @@
-#include "bilateral_blur.hpp"
+#include "bilateral_pyr_blur.hpp"
 
-MyBilateralBlurTest::MyBilateralBlurTest() {
+MyBilateralPyrBlurTest::MyBilateralPyrBlurTest() {
 }
 
-MyBilateralBlurTest::~MyBilateralBlurTest() {
+MyBilateralPyrBlurTest::~MyBilateralPyrBlurTest() {
 }
 
-Mat MyBilateralBlurTest::CalGaussianTemplate(int r, float sigma) {
+Mat MyBilateralPyrBlurTest::CalGaussianTemplate(int r, float sigma) {
     float pi = 3.1415926;
     int center = r;
     int ksize = r*2+1;
@@ -26,7 +26,7 @@ Mat MyBilateralBlurTest::CalGaussianTemplate(int r, float sigma) {
     return Kore;
 }
 
-vector<float> MyBilateralBlurTest::CalValueTemplate(float sigma) {
+vector<float> MyBilateralPyrBlurTest::CalValueTemplate(float sigma) {
     vector<float> val_weight_arr;
 
     for(int i=0; i<256; i++) {
@@ -37,7 +37,7 @@ vector<float> MyBilateralBlurTest::CalValueTemplate(float sigma) {
     return val_weight_arr;
 }
     
-Mat MyBilateralBlurTest::BilateralBlur(Mat src, Mat gaussian_kore, vector<float> val_weight_arr, int r) {
+Mat MyBilateralPyrBlurTest::BilateralBlur(Mat src, Mat gaussian_kore, vector<float> val_weight_arr, int r) {
     Mat out = Mat::zeros(src.size(), src.type());
 
     for (int i=r; i<src.rows-r; i++) {
@@ -59,11 +59,52 @@ Mat MyBilateralBlurTest::BilateralBlur(Mat src, Mat gaussian_kore, vector<float>
     return out;
 }
 
-Mat MyBilateralBlurTest::Run(Mat src, int r, float gauss_sigma, float value_sigma) {
+vector<Mat> MyBilateralPyrBlurTest::LaplacianPyramid(Mat img, int level) {
+    vector<Mat> pyr;
+    Mat item = img;
+    for (int i = 1; i < level; i++) {
+        Mat item_down;
+        Mat item_up;
+        resize(item, item_down, item.size()/2, 0, 0, INTER_AREA);
+        resize(item_down, item_up, item.size());
+
+        Mat diff(item.size(), CV_16SC1);
+        for(int m=0; m<item.rows; m++){
+            short *ptr_diff = diff.ptr<short>(m);
+            uchar *ptr_up   = item_up.ptr(m);
+            uchar *ptr_item = item.ptr(m);
+
+            for(int n=0; n<item.cols; n++){
+                ptr_diff[n] = (short)ptr_item[n] - (short)ptr_up[n];//求残差
+            }
+        }
+        pyr.push_back(diff);
+        item = item_down;
+    }
+    item.convertTo(item, CV_16SC1);
+    pyr.push_back(item);
+
+    return pyr;
+}
+
+Mat MyBilateralPyrBlurTest::Run(Mat src, int r, float gauss_sigma, float value_sigma) {
     Mat gaussian_kore = CalGaussianTemplate(r, gauss_sigma);
     vector<float> val_weight_arr = CalValueTemplate(value_sigma);
 
-    Mat bilateral_blur = BilateralBlur(src, gaussian_kore, val_weight_arr, r);
+    int level = 3;
+    vector<Mat> src_arr = LaplacianPyramid(src, level);
+
+    Mat cur_src = src_arr[level-1];
+    Mat bilateral_blur;
+    for(int i=level-1; i>=0; i--) {
+        cur_src.convertTo(cur_src, CV_8UC1);
+        bilateral_blur = BilateralBlur(cur_src, gaussian_kore, val_weight_arr, r);
+        if(i>0) {
+            resize(bilateral_blur, cur_src, src_arr[i-1].size());
+            cur_src.convertTo(cur_src, CV_16SC1);
+            cur_src = cur_src + src_arr[i-1];
+        }
+    }
 
 	return bilateral_blur;
 }
