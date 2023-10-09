@@ -65,22 +65,22 @@ int example_filtering(int argc,char*argv[])
 	float sigma_spatial=atof(argv[3]);
 	float sigma_range=atof(argv[4]);
 
-	Mat src = imread(argv[1]);
-	imwrite(argv[1], src);
+	Mat src = imread(argv[1], 0);
+	imshow(argv[1], src);
 	int h = src.rows;
 	int w = src.cols;
 
-	unsigned char***texture=qx_allocu_3(h,w,3);
-	double***image=qx_allocd_3(h,w,3);
-	double***image_filtered=qx_allocd_3(h,w,3);
-	double***temp=qx_allocd_3(h,w,3);
-	double***temp_2=qx_allocd_3(2,w,3);
+	unsigned char***texture=qx_allocu_3(h,w,1);
+	double***image=qx_allocd_3(h,w,1);
+	double***image_filtered=qx_allocd_3(h,w,1);
+	double***temp=qx_allocd_3(h,w,1);
+	double***temp_2=qx_allocd_3(2,w,1);
 
 	for(int y=0;y<h;y++) {
 		for(int x=0;x<w;x++) {
-			for(int c=0;c<3;c++) {
-				image[y][x][c] = src.at<uchar>(y, x*3+c);
-				texture[y][x][c] = src.at<uchar>(y, x*3+c);
+			for(int c=0;c<1;c++) {
+				image[y][x][c] = src.at<uchar>(y, x);
+				texture[y][x][c] = src.at<uchar>(y, x);
 			}
 		}
 	}
@@ -94,8 +94,8 @@ int example_filtering(int argc,char*argv[])
 	Mat out = src.clone();
 	for(int y=0;y<h;y++) {
 		for(int x=0;x<w;x++) {
-			for(int c=0;c<3;c++) {
-				out.at<uchar>(y, x*3+c) = (uchar)image_filtered[y][x][c];
+			for(int c=0;c<1;c++) {
+				out.at<uchar>(y, x) = (uchar)image_filtered[y][x][c];
 			}
 		}
 	}
