@@ -21,5 +21,5 @@ class MyRecursiveBilateral{
 		Mat Run(Mat src, float sigma_spatial, float sigma_range);
 
     private:
-        Mat HorizontalFiltering(Mat src, double *range_table, double alpha);
+        Mat HorizontalFiltering(Mat src, double *range_table, float sigma_spatial);
 };
