@@ -6,7 +6,7 @@ MyRecursiveBilateral::MyRecursiveBilateral() {
 MyRecursiveBilateral::~MyRecursiveBilateral() {
 }
 
-Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, float sigma_spatial) {
+Mat MyRecursiveBilateral::BilateralFiltering(Mat src, double *range_table, float sigma_spatial) {
     Mat out1 = Mat::zeros(src.size(), CV_64FC1);
     Mat out2 = Mat::zeros(src.size(), CV_64FC1);
     Mat factor_mat1 = Mat::zeros(src.size(), CV_64FC1);
@@ -30,8 +30,8 @@ Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, floa
             int dr = abs(ptr_src[j] - ptr_src[j-1]);
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
-            ptr_out1[j]    = ypr = (1.0 - alpha) * ptr_src[j] + alpha_* ypr;
-            ptr_factor1[j] = fp = (1.0 - alpha) + alpha_*fp;
+            ptr_out1[j]    = ypr = (1.0 - alpha_) * ptr_src[j] + alpha_* ypr;
+            ptr_factor1[j] = fp = (1.0 - alpha_) + alpha_*fp;
 
         }
         ypr = ptr_out1[src.cols-1] / ptr_factor1[src.cols-1];
@@ -44,8 +44,8 @@ Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, floa
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
 
-            ptr_out2[j]    = ypr = (1.0 - alpha) * ptr_src[j] + alpha_* ypr;
-            ptr_factor2[j] = fp = (1.0 - alpha) + alpha_*fp;
+            ptr_out2[j]    = ypr = (1.0 - alpha_) * ptr_src[j] + alpha_* ypr;
+            ptr_factor2[j] = fp = (1.0 - alpha_) + alpha_*fp;
         }
     }
     
@@ -67,8 +67,8 @@ Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, floa
             int dr = abs(src.at<uchar>(i, j) - src.at<uchar>(i-1, j));
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
-            out3.at<double>(i, j) = (1.0 - alpha)*out2.at<double>(i, j) + alpha_* out3.at<double>(i-1, j);
-            factor_mat3.at<double>(i, j) = (1.0 - alpha)*factor_mat2.at<double>(i, j) + alpha_* factor_mat3.at<double>(i-1, j);
+            out3.at<double>(i, j) = (1.0 - alpha_)*out2.at<double>(i, j) + alpha_* out3.at<double>(i-1, j);
+            factor_mat3.at<double>(i, j) = (1.0 - alpha_)*factor_mat2.at<double>(i, j) + alpha_* factor_mat3.at<double>(i-1, j);
         }
     }
 
@@ -77,8 +77,8 @@ Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, floa
             int dr = abs(src.at<uchar>(i, j) - src.at<uchar>(i+1, j));
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
-            out4.at<double>(i, j) = (1.0 - alpha)*out2.at<double>(i, j) + alpha_* out4.at<double>(i+1, j);
-            factor_mat4.at<double>(i, j) = (1.0 - alpha)*factor_mat2.at<double>(i, j) + alpha_* factor_mat4.at<double>(i+1, j);
+            out4.at<double>(i, j) = (1.0 - alpha_)*out2.at<double>(i, j) + alpha_* out4.at<double>(i+1, j);
+            factor_mat4.at<double>(i, j) = (1.0 - alpha_)*factor_mat2.at<double>(i, j) + alpha_* factor_mat4.at<double>(i+1, j);
         }
     }
     
@@ -101,7 +101,7 @@ Mat MyRecursiveBilateral::Run(Mat src, float sigma_spatial, float sigma_range) {
         range_table[i]=exp(-i*inv_sigma_range);
     }
 
-    Mat out = HorizontalFiltering(src, range_table, sigma_spatial);
+    Mat out = BilateralFiltering(src, range_table, sigma_spatial);
 
 	return out;
 }
