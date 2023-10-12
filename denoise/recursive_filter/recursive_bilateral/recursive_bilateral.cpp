@@ -13,7 +13,6 @@ Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, floa
     Mat factor_mat2 = Mat::zeros(src.size(), CV_64FC1);
     
     double alpha = exp(-sqrt(2.0)/(sigma_spatial*src.cols));
-    cout << "!!! alpha:" << alpha << endl;
 
     double ypr;
     for(int i=0; i<src.rows; i++) {
@@ -45,8 +44,8 @@ Mat MyRecursiveBilateral::HorizontalFiltering(Mat src, double *range_table, floa
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
 
-            ptr_out2[j]    = ypr = (1.0 - alpha_) * ptr_src[j] + alpha_* ypr;
-            ptr_factor2[j] = fp = (1.0 - alpha_) + alpha_*fp;
+            ptr_out2[j]    = ypr = (1.0 - alpha) * ptr_src[j] + alpha_* ypr;
+            ptr_factor2[j] = fp = (1.0 - alpha) + alpha_*fp;
         }
     }
     
