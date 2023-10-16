@@ -14,15 +14,16 @@
 #include "bilateral_pyr_blur.hpp"
 #include "bilateral_separable_conv.hpp"
 #include "bilateral_trigonometric.hpp"
+#include "bilateral_grid.hpp"
 
 int main(int argc, char* argv[]) {
     Mat src = imread(argv[1], 0);
     imshow("src", src);
 
-    int r = 11;
-    float gauss_sigma = 3;
+    int r = 3;
+    float gauss_sigma = 1.0;
     float value_sigma = 3;
-/*
+
 	MyBilateralOriTest *my_bilateral_ori_test = new MyBilateralOriTest();
     Mat bilateral_ori = my_bilateral_ori_test->Run(src, r, gauss_sigma, value_sigma);
     imshow("bilateral_ori", bilateral_ori);
@@ -47,11 +48,15 @@ int main(int argc, char* argv[]) {
 	MyBilateralSepConvTest *my_bilateral_sep_conv_test = new MyBilateralSepConvTest();
     Mat sep_conv = my_bilateral_sep_conv_test->Run(src, r, gauss_sigma, value_sigma);
     imshow("sep_conv", sep_conv);
-*/
- 
+
 	MyBilateralTriTest *my_bilateral_tri_test = new MyBilateralTriTest();
     Mat bilateral_tri = my_bilateral_tri_test->Run(src, r, gauss_sigma, value_sigma);
     imshow("bilateral_tri", bilateral_tri);
+    
+	MyBilateralGridTest *my_bilateral_grid_test = new MyBilateralGridTest();
+    Mat bilateral_grid = my_bilateral_grid_test->Run(src, r, gauss_sigma, value_sigma);
+    imshow("bilateral_grid", bilateral_grid);
+
     waitKey(0);
 
     return 0;
