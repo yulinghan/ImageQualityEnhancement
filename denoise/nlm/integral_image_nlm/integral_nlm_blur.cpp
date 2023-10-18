@@ -12,15 +12,13 @@ Mat MyIntegralNlmBlurTest::GetIntegralImg(Mat src) {
 
     Mat out;
     src.convertTo(out, CV_32F);
-    out = out - 128;
 
-    //横向添加
     for (int i=0;i<Height;i++) {
         for (int j = 1; j < Width; j++) {
             out.at<float>(i, j) += out.at<float>(i, j - 1);
         }
     }
-    //竖向相加
+
     for (int i = 1; i < Height; i++) {
         for (int j = 0; j < Width; j++) {
             out.at<float>(i, j) += out.at<float>(i-1, j);
@@ -32,7 +30,7 @@ Mat MyIntegralNlmBlurTest::GetIntegralImg(Mat src) {
 
 Mat MyIntegralNlmBlurTest::Nlm(Mat src, float h, int halfKernelSize, int halfSearchSize) {
     Mat dst = Mat::zeros(src.size(), CV_8UC1);
-    int boardSize = halfKernelSize + halfSearchSize;
+    int boardSize = halfKernelSize + halfSearchSize + 1;
     Mat boardSrc;
     copyMakeBorder(src, boardSrc, boardSize, boardSize, boardSize, boardSize, BORDER_REFLECT);   //边界扩展
 
@@ -51,16 +49,16 @@ Mat MyIntegralNlmBlurTest::Nlm(Mat src, float h, int halfKernelSize, int halfSea
             double w = 0;
             double p = 0;
             double sumw = 0;
-            float center_patch_sum = integral_mat.at<float>(j-halfKernelSize, i-halfKernelSize) + integral_mat.at<float>(j+halfKernelSize, i+halfKernelSize)
-                                - integral_mat.at<float>(j-halfKernelSize, i+halfKernelSize) - integral_mat.at<float>(j+halfKernelSize, i-halfKernelSize);
+            float center_patch_sum = integral_mat.at<float>(j-halfKernelSize-1, i-halfKernelSize-1) + integral_mat.at<float>(j+halfKernelSize, i+halfKernelSize)
+                                - integral_mat.at<float>(j-halfKernelSize-1, i+halfKernelSize) - integral_mat.at<float>(j+halfKernelSize, i-halfKernelSize-1);
 
             for (int sr = -halfSearchSize; sr <= halfSearchSize; sr++) {
                 uchar *boardSrc_p = boardSrc.ptr<uchar>(j + sr);
                 for (int sc = -halfSearchSize; sc <= halfSearchSize; sc++) {
-                    float cur_patch_sum = integral_mat.at<float>(j+sr-halfKernelSize, i+sc-halfKernelSize) + integral_mat.at<float>(j+sr+halfKernelSize, i+sc+halfKernelSize)
-                                - integral_mat.at<float>(j+sr-halfKernelSize, i+sc+halfKernelSize) - integral_mat.at<float>(j+sr+halfKernelSize, i+sc-halfKernelSize);
+                    float cur_patch_sum = integral_mat.at<float>(j+sr-halfKernelSize-1, i+sc-halfKernelSize-1) + integral_mat.at<float>(j+sr+halfKernelSize, i+sc+halfKernelSize)
+                                - integral_mat.at<float>(j+sr-halfKernelSize-1, i+sc+halfKernelSize) - integral_mat.at<float>(j+sr+halfKernelSize, i+sc-halfKernelSize-1);
 
-                    float sum = (center_patch_sum - cur_patch_sum) * (center_patch_sum - cur_patch_sum);
+                    float sum = (center_patch_sum - cur_patch_sum)*(center_patch_sum - cur_patch_sum);
                     w = exp(-(sum*h));
                     p += boardSrc_p[i + sc] * w;
                     sumw += w;
