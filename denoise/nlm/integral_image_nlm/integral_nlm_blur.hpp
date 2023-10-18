@@ -21,6 +21,6 @@ class MyIntegralNlmBlurTest{
 		Mat Run(Mat src, float h, int halfKernelSize, int halfSearchSize);
 
     private:
-        Mat GetIntegralImg(Mat src);
+        Mat GetIntegralImg(Mat src, int halfSearchSize, int t1, int t2);
         Mat Nlm(Mat src, float h, int halfKernelSize, int halfSearchSize);
 };

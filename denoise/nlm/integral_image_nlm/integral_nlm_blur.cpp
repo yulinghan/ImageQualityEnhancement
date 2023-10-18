@@ -6,21 +6,21 @@ MyIntegralNlmBlurTest::MyIntegralNlmBlurTest() {
 MyIntegralNlmBlurTest::~MyIntegralNlmBlurTest() {
 }
 
-Mat MyIntegralNlmBlurTest::GetIntegralImg(Mat src) {
-    int Height = src.rows;
-    int Width = src.cols;
+Mat MyIntegralNlmBlurTest::GetIntegralImg(Mat src, int halfSearchSize, int t1, int t2) {
+    src.convertTo(src, CV_32F);
+    Mat d1 = src(Range(halfSearchSize, src.rows-halfSearchSize), Range(halfSearchSize, src.cols-halfSearchSize));
+    Mat d2 = src(Range(halfSearchSize+t1, src.rows-halfSearchSize+t1), Range(halfSearchSize+t2, src.cols-halfSearchSize+t2));
 
-    Mat out;
-    src.convertTo(out, CV_32F);
+    Mat out = (d1-d2).mul(d1-d2);
 
-    for (int i=0;i<Height;i++) {
-        for (int j = 1; j < Width; j++) {
+    for (int i=0;i<out.rows;i++) {
+        for (int j = 1; j<out.cols; j++) {
             out.at<float>(i, j) += out.at<float>(i, j - 1);
         }
     }
 
-    for (int i = 1; i < Height; i++) {
-        for (int j = 0; j < Width; j++) {
+    for (int i = 1; i<out.rows; i++) {
+        for (int j = 0; j<out.cols; j++) {
             out.at<float>(i, j) += out.at<float>(i-1, j);
         }
     }
@@ -28,46 +28,40 @@ Mat MyIntegralNlmBlurTest::GetIntegralImg(Mat src) {
     return out;
 }
 
-Mat MyIntegralNlmBlurTest::Nlm(Mat src, float h, int halfKernelSize, int halfSearchSize) {
-    Mat dst = Mat::zeros(src.size(), CV_8UC1);
-    int boardSize = halfKernelSize + halfSearchSize + 1;
+Mat MyIntegralNlmBlurTest::Nlm(Mat src, float h, int hk, int hs) {
+    Mat dst    = Mat::zeros(src.size(), CV_32FC1);
+    Mat weight = Mat::zeros(src.size(), CV_32FC1);
+    int boardSize = hk + hs + 1;
     Mat boardSrc;
     copyMakeBorder(src, boardSrc, boardSize, boardSize, boardSize, boardSize, BORDER_REFLECT);   //边界扩展
 
-    Mat integral_mat = GetIntegralImg(boardSrc);
-
     float h1 = 1.0 / (h*h);
-    float h2 = 1.0 / (2*halfKernelSize+1) / (2*halfKernelSize+1);
+    float h2 = 1.0 / (2*hk+1) / (2*hk+1);
     h = h1*h2;
 
     int rows = src.rows;
     int cols = src.cols;
 
-    for (int j = boardSize; j < boardSize + rows; j++) {
-        uchar *dst_p = dst.ptr<uchar>(j - boardSize);
-        for (int i = boardSize; i < boardSize + cols; i++) {
-            double w = 0;
-            double p = 0;
-            double sumw = 0;
-            float center_patch_sum = integral_mat.at<float>(j-halfKernelSize-1, i-halfKernelSize-1) + integral_mat.at<float>(j+halfKernelSize, i+halfKernelSize)
-                                - integral_mat.at<float>(j-halfKernelSize-1, i+halfKernelSize) - integral_mat.at<float>(j+halfKernelSize, i-halfKernelSize-1);
-
-            for (int sr = -halfSearchSize; sr <= halfSearchSize; sr++) {
-                uchar *boardSrc_p = boardSrc.ptr<uchar>(j + sr);
-                for (int sc = -halfSearchSize; sc <= halfSearchSize; sc++) {
-                    float cur_patch_sum = integral_mat.at<float>(j+sr-halfKernelSize-1, i+sc-halfKernelSize-1) + integral_mat.at<float>(j+sr+halfKernelSize, i+sc+halfKernelSize)
-                                - integral_mat.at<float>(j+sr-halfKernelSize-1, i+sc+halfKernelSize) - integral_mat.at<float>(j+sr+halfKernelSize, i+sc-halfKernelSize-1);
-
-                    float sum = (center_patch_sum - cur_patch_sum)*(center_patch_sum - cur_patch_sum);
-                    w = exp(-(sum*h));
-                    p += boardSrc_p[i + sc] * w;
-                    sumw += w;
+    for(int t1 = -hs; t1<hs; t1++) {
+        for(int t2 = -hs; t2<hs; t2++) {
+            Mat integral_mat = GetIntegralImg(boardSrc, hs, t1, t2);
+            for(int i=0; i<src.rows; i++) {
+                for(int j=0; j<src.cols; j++) {
+                    int i1 = i+hk+1;
+                    int j1 = j+hk+1;
+                    float sum = integral_mat.at<float>(i1+hk, j1+hk) + integral_mat.at<float>(i1-hk-1, j1-hk-1) 
+                                - integral_mat.at<float>(i1+hk, j1-hk-1) - integral_mat.at<float>(i1-hk-1, j1+hk);
+                    float cur_weight = exp(-sum*h);
+                    weight.at<float>(i, j) += cur_weight;
+                    dst.at<float>(i, j) += boardSrc.at<uchar>(hk+hs+t1+i, hk+hs+t2+j) * cur_weight;
                 }
             }
-
-            dst_p[i - boardSize] = saturate_cast<uchar>(p / sumw);
         }
     }
+
+    dst = dst / weight;
+    dst.convertTo(dst, CV_8UC1);   
+
     return dst;
 }
 

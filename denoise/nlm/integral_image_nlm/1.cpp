@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     Mat src = imread(argv[1], 0);
     imshow("src", src);
 
-    float h = 38.3;
+    float h = 8.3;
     int halfKernelSize = 3;
     int halfSearchSize = 9;
 
