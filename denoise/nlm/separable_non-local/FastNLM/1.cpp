@@ -14,13 +14,15 @@
 int main(int argc, char* argv[]) {
     Mat src = imread(argv[1], 0);
     imshow("src", src);
+    imwrite("src.jpg", src);
 
-    float h = 8.1;
-    int halfKernelSize = 3;
-    int halfSearchSize = 9;
+    float h = 27.1;
+    int halfKernelSize = 7;
+    int halfSearchSize = 21;
 	MySepNlmBlurTest *my_sep_nlm_blur_test = new MySepNlmBlurTest();
     Mat sep_nlm_blur = my_sep_nlm_blur_test->Run(src, h, halfKernelSize, halfSearchSize);
     imshow("sep_nlm_blur", sep_nlm_blur);
+    imwrite("sep_nlm_blur.jpg", sep_nlm_blur);
 
     waitKey(0);
 

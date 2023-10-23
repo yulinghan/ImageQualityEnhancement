@@ -23,6 +23,7 @@ class MySepNlmBlurTest{
     private:
         float MseBlock(Mat m1, Mat m2);
         Mat Nlm(Mat src, float h, int halfKernelSize, int halfSearchSize);
+        Mat CalF(Mat src, int S, int K, float beta);
 
     private:
         float table1[256];
