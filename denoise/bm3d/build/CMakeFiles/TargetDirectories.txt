@@ -1,3 +1,0 @@
-/home/guest/workspace/bm3d/build/CMakeFiles/bm3d.dir
-/home/guest/workspace/bm3d/build/CMakeFiles/edit_cache.dir
-/home/guest/workspace/bm3d/build/CMakeFiles/rebuild_cache.dir
