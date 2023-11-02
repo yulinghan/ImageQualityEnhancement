@@ -25,9 +25,6 @@ int run_bm3d(
 ,   const unsigned chnls
 ,   const bool useSD_h
 ,   const bool useSD_w
-,   const unsigned tau_2D_hard
-,   const unsigned tau_2D_wien
-,   const unsigned color_space
 ,   const unsigned patch_size = 0
 );
 
@@ -44,8 +41,6 @@ void bm3d_1st_step(
 ,   const unsigned NHard
 ,   const unsigned pHard
 ,   const bool     useSD
-,   const unsigned color_space
-,   const unsigned tau_2D
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
@@ -65,8 +60,6 @@ void bm3d_2nd_step(
 ,   const unsigned NWien
 ,   const unsigned pWien
 ,   const bool     useSD
-,   const unsigned color_space
-,   const unsigned tau_2D
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv

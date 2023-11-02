@@ -1,23 +1,3 @@
-/*
- * Copyright (c) 2011, Marc Lebrun <marc.lebrun@cmla.ens-cachan.fr>
- * All rights reserved.
- *
- * This program is free software: you can use, modify and/or
- * redistribute it under the terms of the GNU General Public
- * License as published by the Free Software Foundation, either
- * version 3 of the License, or (at your option) any later
- * version. You should have received a copy of this license along
- * this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-
-/**
- * @file bm3d.cpp
- * @brief BM3D denoising functions
- *
- * @author Marc Lebrun <marc.lebrun@cmla.ens-cachan.fr>
- **/
-
 #include <iostream>
 #include <algorithm>
 #include <math.h>
@@ -28,13 +8,8 @@
 
 #define SQRT2     1.414213562373095
 #define SQRT2_INV 0.7071067811865475
-#define YUV       0
-#define YCBCR     1
-#define OPP       2
-#define RGB       3
 #define DCT       4
 #define BIOR      5
-#define HADAMARD  6
 
 
 /* 
@@ -78,8 +53,6 @@ bool ComparaisonFirst(pair<float,unsigned> pair1, pair<float,unsigned> pair2)
  * @param tau_2D_hard (resp. tau_2D_wien): 2D transform to apply
  *        on every 3D group for the first (resp. second) part.
  *        Allowed values are DCT and BIOR;
- * @param color_space: Transformation from RGB to YUV. Allowed
- *        values are RGB (do nothing), YUV, YCBCR and OPP.
  * @param patch_size: overrides the default patch size selection.
  *        patch_size=0: use default behavior
  *        patch_size>0: size to be used
@@ -97,9 +70,6 @@ int run_bm3d(
 ,   const unsigned chnls
 ,   const bool useSD_h
 ,   const bool useSD_w
-,   const unsigned tau_2D_hard
-,   const unsigned tau_2D_wien
-,   const unsigned color_space
 ,   const unsigned patch_size
 ){
     //! Parameters
@@ -109,35 +79,18 @@ int run_bm3d(
     const unsigned NWien = 32; //! Must be a power of 2
     const unsigned pHard = 3;
     const unsigned pWien = 3;
-    // patch_size must be larger than 0
-    if (patch_size != 0)
-    {
-      // patch_size must be a power of 2 if tau_2D_* == BIOR
-      if ((tau_2D_hard == BIOR ||
-           tau_2D_wien == BIOR) &&
-          (patch_size & (patch_size - 1)) != 0)
-      {
-          cout << "Parameter patch_size must be a power of 2 if tau_2D_* == BIOR" << endl;
-          return EXIT_FAILURE;
-      }
-    }
+
     //! Overrides size if patch_size>0, else default behavior (8 or 12 depending on test)
     const unsigned kHard = patch_size > 0 ? patch_size :
-       ((tau_2D_hard == BIOR || sigma < 40.f) ? 8 : 12);
+       ((sigma < 40.f) ? 8 : 12);
     const unsigned kWien = patch_size > 0 ? patch_size :
-       ((tau_2D_wien == BIOR || sigma < 40.f) ? 8 : 12);
+       ((sigma < 40.f) ? 8 : 12);
 
     //! Check memory allocation
     if (img_basic.size() != img_noisy.size())
         img_basic.resize(img_noisy.size());
     if (img_denoised.size() != img_noisy.size())
         img_denoised.resize(img_noisy.size());
-
-    //! Transformation to YUV color space
-    if (color_space_transform(img_noisy, color_space, width, height, chnls, true)
-        != EXIT_SUCCESS) return EXIT_FAILURE;
-
-    //! Check if OpenMP is used or if number of cores of the computer is > 1
 
     //! Allocate plan for FFTW library
     fftwf_plan plan_2d_for_1;
@@ -150,26 +103,13 @@ int run_bm3d(
     vector<float> img_sym_noisy, img_sym_basic, img_sym_denoised;
     symetrize(img_noisy, img_sym_noisy, width, height, chnls, nHard);
 
-    //! Allocating Plan for FFTW process
-    if (tau_2D_hard == DCT)
-    {
-        const unsigned nb_cols = ind_size(w_b - kHard + 1, nHard, pHard);
-        allocate_plan_2d(&plan_2d_for_1, kHard, FFTW_REDFT10,
-                w_b * (2 * nHard + 1) * chnls);
-        allocate_plan_2d(&plan_2d_for_2, kHard, FFTW_REDFT10,
-                w_b * pHard * chnls);
-        allocate_plan_2d(&plan_2d_inv, kHard, FFTW_REDFT01,
-                NHard * nb_cols * chnls);
-    }
-
     //! Denoising, 1st Step
     bm3d_1st_step(sigma, img_sym_noisy, img_sym_basic, w_b, h_b, chnls, nHard,
-            kHard, NHard, pHard, useSD_h, color_space, tau_2D_hard,
+            kHard, NHard, pHard, useSD_h,
             &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
 
     //! To avoid boundaries problem
-    for (unsigned c = 0; c < chnls; c++)
-    {
+    for (unsigned c = 0; c < chnls; c++) {
         const unsigned dc_b = c * w_b * h_b + nHard * w_b + nHard;
         unsigned dc = c * width * height;
         for (unsigned i = 0; i < height; i++)
@@ -179,21 +119,17 @@ int run_bm3d(
     symetrize(img_basic, img_sym_basic, width, height, chnls, nHard);
 
     //! Allocating Plan for FFTW process
-    if (tau_2D_wien == DCT)
-    {
-        const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
-        allocate_plan_2d(&plan_2d_for_1, kWien, FFTW_REDFT10,
-                w_b * (2 * nWien + 1) * chnls);
-        allocate_plan_2d(&plan_2d_for_2, kWien, FFTW_REDFT10,
-                w_b * pWien * chnls);
-        allocate_plan_2d(&plan_2d_inv, kWien, FFTW_REDFT01,
-                NWien * nb_cols * chnls);
-    }
+    const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
+    allocate_plan_2d(&plan_2d_for_1, kWien, FFTW_REDFT10,
+            w_b * (2 * nWien + 1) * chnls);
+    allocate_plan_2d(&plan_2d_for_2, kWien, FFTW_REDFT10,
+            w_b * pWien * chnls);
+    allocate_plan_2d(&plan_2d_inv, kWien, FFTW_REDFT01,
+            NWien * nb_cols * chnls);
 
     //! Denoising, 2nd Step
     bm3d_2nd_step(sigma, img_sym_noisy, img_sym_basic, img_sym_denoised,
-            w_b, h_b, chnls, nWien, kWien, NWien, pWien, useSD_w, color_space,
-            tau_2D_wien, &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
+            w_b, h_b, chnls, nWien, kWien, NWien, pWien, useSD_w, &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
 
     //! Obtention of img_denoised
     for (unsigned c = 0; c < chnls; c++)
@@ -205,20 +141,10 @@ int run_bm3d(
                 img_denoised[dc] = img_sym_denoised[dc_b + i * w_b + j];
     }
 
-    //! Inverse color space transform to RGB
-    if (color_space_transform(img_denoised, color_space, width, height, chnls, false)
-        != EXIT_SUCCESS) return EXIT_FAILURE;
-    if (color_space_transform(img_noisy, color_space, width, height, chnls, false)
-        != EXIT_SUCCESS) return EXIT_FAILURE;
-    if (color_space_transform(img_basic, color_space, width, height, chnls, false)
-        != EXIT_SUCCESS) return EXIT_FAILURE;
-
     //! Free Memory
-    if (tau_2D_hard == DCT || tau_2D_wien == DCT){
-        fftwf_destroy_plan(plan_2d_for_1);
-        fftwf_destroy_plan(plan_2d_for_2);
-        fftwf_destroy_plan(plan_2d_inv);
-    }
+    fftwf_destroy_plan(plan_2d_for_1);
+    fftwf_destroy_plan(plan_2d_for_2);
+    fftwf_destroy_plan(plan_2d_inv);
     fftwf_cleanup();
 
     return EXIT_SUCCESS;
@@ -256,16 +182,13 @@ void bm3d_1st_step(
 ,   const unsigned NHard
 ,   const unsigned pHard
 ,   const bool     useSD
-,   const unsigned color_space
-,   const unsigned tau_2D
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
 ){
     //! Estimatation of sigma on each channel
     vector<float> sigma_table(chnls);
-    if (estimate_sigma(sigma, sigma_table, chnls, color_space) != EXIT_SUCCESS)
-        return;
+    sigma_table[0] = sigma;
 
     //! Parameters initialization
     const float    lambdaHard3D = 2.7f;            //! Threshold for Hard Thresholding
@@ -313,13 +236,8 @@ void bm3d_1st_step(
         const unsigned i_r = row_ind[ind_i];
 
         //! Update of table_2D
-        if (tau_2D == DCT)
-            dct_2d_process(table_2D, img_noisy, plan_2d_for_1, plan_2d_for_2, nHard,
-                           width, height, chnls, kHard, i_r, pHard, coef_norm,
-                           row_ind[0], row_ind.back());
-        else if (tau_2D == BIOR)
-            bior_2d_process(table_2D, img_noisy, nHard, width, height, chnls,
-                        kHard, i_r, pHard, row_ind[0], row_ind.back(), lpd, hpd);
+        bior_2d_process(table_2D, img_noisy, nHard, width, height, chnls,
+                kHard, i_r, pHard, row_ind[0], row_ind.back(), lpd, hpd);
 
         wx_r_table.clear();
         group_3D_table.clear();
@@ -368,11 +286,7 @@ void bm3d_1st_step(
         } //! End of loop on j_r
 
         //!  Apply 2D inverse transform
-        if (tau_2D == DCT)
-            dct_2d_inverse(group_3D_table, kHard, NHard * chnls * column_ind.size(),
-                           coef_norm_inv, plan_2d_inv);
-        else if (tau_2D == BIOR)
-            bior_2d_inverse(group_3D_table, kHard, lpr, hpr);
+        bior_2d_inverse(group_3D_table, kHard, lpr, hpr);
 
         //! Registration of the weighted estimation
         unsigned dec = 0;
@@ -442,16 +356,13 @@ void bm3d_2nd_step(
 ,   const unsigned NWien
 ,   const unsigned pWien
 ,   const bool     useSD
-,   const unsigned color_space
-,   const unsigned tau_2D
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
 ){
     //! Estimatation of sigma on each channel
     vector<float> sigma_table(chnls);
-    if (estimate_sigma(sigma, sigma_table, chnls, color_space) != EXIT_SUCCESS)
-        return;
+    sigma_table[0] = sigma;
 
     //! Parameters initialization
     const float tauMatch = (sigma_table[0] < 35.0f ? 400 : 3500); //! threshold used to determinate similarity between patches
@@ -499,22 +410,12 @@ void bm3d_2nd_step(
         const unsigned i_r = row_ind[ind_i];
 
         //! Update of DCT_table_2D
-        if (tau_2D == DCT)
-        {
-            dct_2d_process(table_2D_img, img_noisy, plan_2d_for_1, plan_2d_for_2,
-                           nWien, width, height, chnls, kWien, i_r, pWien, coef_norm,
-                           row_ind[0], row_ind.back());
-            dct_2d_process(table_2D_est, img_basic, plan_2d_for_1, plan_2d_for_2,
-                           nWien, width, height, chnls, kWien, i_r, pWien, coef_norm,
-                           row_ind[0], row_ind.back());
-        }
-        else if (tau_2D == BIOR)
-        {
-            bior_2d_process(table_2D_img, img_noisy, nWien, width, height,
-                chnls, kWien, i_r, pWien, row_ind[0], row_ind.back(), lpd, hpd);
-            bior_2d_process(table_2D_est, img_basic, nWien, width, height,
-                chnls, kWien, i_r, pWien, row_ind[0], row_ind.back(), lpd, hpd);
-        }
+        dct_2d_process(table_2D_img, img_noisy, plan_2d_for_1, plan_2d_for_2,
+                nWien, width, height, chnls, kWien, i_r, pWien, coef_norm,
+                row_ind[0], row_ind.back());
+        dct_2d_process(table_2D_est, img_basic, plan_2d_for_1, plan_2d_for_2,
+                nWien, width, height, chnls, kWien, i_r, pWien, coef_norm,
+                row_ind[0], row_ind.back());
 
         wx_r_table.clear();
         group_3D_table.clear();
@@ -567,11 +468,8 @@ void bm3d_2nd_step(
         } //! End of loop on j_r
 
         //!  Apply 2D dct inverse
-        if (tau_2D == DCT)
-            dct_2d_inverse(group_3D_table, kWien, NWien * chnls * column_ind.size(),
-                           coef_norm_inv, plan_2d_inv);
-        else if (tau_2D == BIOR)
-            bior_2d_inverse(group_3D_table, kWien, lpr, hpr);
+        dct_2d_inverse(group_3D_table, kWien, NWien * chnls * column_ind.size(),
+                coef_norm_inv, plan_2d_inv);
 
         //! Registration of the weighted estimation
         unsigned dec = 0;
@@ -1249,7 +1147,6 @@ void precompute_BM(
 			//! To avoid problem
 			if (nSx_r == 1 && table_distance.size() == 0)
 			{
-//				cout << "problem size" << endl;
 				table_distance.push_back(make_pair(0, k_r));
 			}
 
