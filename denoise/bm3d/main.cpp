@@ -53,11 +53,9 @@ const char *pick_option(int *c, char **v, const char *o, const char *d) {
 int main(int argc, char **argv)
 {
     //! Variables initialization
-    const bool useSD_1 = pick_option(&argc, argv, "useSD_hard", NULL) != NULL;
-    const bool useSD_2 = pick_option(&argc, argv, "useSD_wien", NULL) != NULL;
-
-    //! Check parameters
-    const int patch_size = 0;
+    const bool useSD_1 = true;
+    const bool useSD_2 = true;
+    const int patch_size = 8;
 
     //! Declarations
     vector<float> img_noisy, img_basic, img_denoised;
@@ -80,7 +78,7 @@ int main(int argc, char **argv)
     float fSigma = 30;
 
     //! Denoising
-    if (run_bm3d(fSigma, img_noisy, img_basic, img_denoised, width, height, chnls,
+    if (run_bm3d(fSigma, img_noisy, img_basic, img_denoised, width, height,
                 useSD_1, useSD_2, patch_size)
             != EXIT_SUCCESS)
         return EXIT_FAILURE;

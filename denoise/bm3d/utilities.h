@@ -10,7 +10,6 @@ void symetrize(
 ,   std::vector<float> &img_sym
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned N
 );
 

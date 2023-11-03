@@ -22,7 +22,6 @@ int run_bm3d(
 ,   std::vector<float> &img_denoised
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const bool useSD_h
 ,   const bool useSD_w
 ,   const unsigned patch_size = 0

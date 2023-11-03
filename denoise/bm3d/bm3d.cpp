@@ -8,9 +8,6 @@
 
 #define SQRT2     1.414213562373095
 #define SQRT2_INV 0.7071067811865475
-#define DCT       4
-#define BIOR      5
-
 
 /* 
  * In order to reproduce the original BM3D the DC coefficients are
@@ -22,8 +19,6 @@
 
 #define DCTHRESH
 #define DCWIENER
-//#define MTRICK
-
 
 using namespace std;
 
@@ -67,12 +62,12 @@ int run_bm3d(
 ,   vector<float> &img_denoised
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const bool useSD_h
 ,   const bool useSD_w
 ,   const unsigned patch_size
 ){
     //! Parameters
+    const unsigned chnls = 1;
     const unsigned nHard = 16; //! Half size of the search window
     const unsigned nWien = 16; //! Half size of the search window
     const unsigned NHard = 16; //! Must be a power of 2
@@ -81,10 +76,8 @@ int run_bm3d(
     const unsigned pWien = 3;
 
     //! Overrides size if patch_size>0, else default behavior (8 or 12 depending on test)
-    const unsigned kHard = patch_size > 0 ? patch_size :
-       ((sigma < 40.f) ? 8 : 12);
-    const unsigned kWien = patch_size > 0 ? patch_size :
-       ((sigma < 40.f) ? 8 : 12);
+    const unsigned kHard = patch_size;
+    const unsigned kWien = patch_size;
 
     //! Check memory allocation
     if (img_basic.size() != img_noisy.size())
@@ -101,7 +94,7 @@ int run_bm3d(
     const unsigned h_b = height + 2 * nHard;
     const unsigned w_b = width  + 2 * nHard;
     vector<float> img_sym_noisy, img_sym_basic, img_sym_denoised;
-    symetrize(img_noisy, img_sym_noisy, width, height, chnls, nHard);
+    symetrize(img_noisy, img_sym_noisy, width, height, nHard);
 
     //! Denoising, 1st Step
     bm3d_1st_step(sigma, img_sym_noisy, img_sym_basic, w_b, h_b, chnls, nHard,
@@ -116,7 +109,7 @@ int run_bm3d(
             for (unsigned j = 0; j < width; j++, dc++)
                 img_basic[dc] = img_sym_basic[dc_b + i * w_b + j];
     }
-    symetrize(img_basic, img_sym_basic, width, height, chnls, nHard);
+    symetrize(img_basic, img_sym_basic, width, height, nHard);
 
     //! Allocating Plan for FFTW process
     const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
@@ -1157,12 +1150,6 @@ void precompute_BM(
             //! Keep a maximum of NHW similar patches
             for (unsigned n = 0; n < nSx_r; n++)
                 patch_table[k_r].push_back(table_distance[n].second);
-
-#ifdef MTRICK
-			//! To avoid problem
-			if (nSx_r == 1)
-				patch_table[k_r].push_back(table_distance[0].second);
-#endif
         }
     }
 }
