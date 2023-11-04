@@ -56,31 +56,26 @@ int main(int argc, char **argv)
     const bool useSD_1 = true;
     const bool useSD_2 = true;
     const int patch_size = 8;
+    float fSigma = 30;
 
     //! Declarations
     vector<float> img_noisy, img_basic, img_denoised;
-    unsigned width, height, chnls;
+    unsigned width, height;
 
     //! Load image
     Mat src = imread(argv[1], 0);
     height = src.rows;
     width  = src.cols;
-    chnls  = src.channels();
 
-    for(int n=src.channels()-1; n>=0; n--) {
-        for(int i=0; i<src.rows; i++) {
-            for(int j=0; j<src.cols; j++) {
-                img_noisy.push_back(src.at<uchar>(i, j*src.channels()+n));
-            }
-        }
-    }
-
-    float fSigma = 30;
+	for(int i=0; i<src.rows; i++) {
+		for(int j=0; j<src.cols; j++) {
+			img_noisy.push_back(src.at<uchar>(i, j));
+		}
+	}
 
     //! Denoising
     if (run_bm3d(fSigma, img_noisy, img_basic, img_denoised, width, height,
-                useSD_1, useSD_2, patch_size)
-            != EXIT_SUCCESS)
+                useSD_1, useSD_2, patch_size) != EXIT_SUCCESS)
         return EXIT_FAILURE;
 
     cout << endl << "Save images...";
@@ -89,16 +84,15 @@ int main(int argc, char **argv)
     Mat denoised_mat = Mat::zeros(src.size(), CV_8UC1);
 
     int mm = 0;
-    for(int n=src.channels()-1; n>=0; n--) {
-        for(int i=0; i<src.rows; i++) {
-            for(int j=0; j<src.cols; j++) {
-                basic_mat.at<uchar>(i, j*src.channels()+n) = img_basic[mm];
-                denoised_mat.at<uchar>(i, j*src.channels()+n) = img_denoised[mm];
-                mm += 1;
-            }
-        }
-    }
-    imwrite(argv[4], basic_mat);
+	for(int i=0; i<src.rows; i++) {
+		for(int j=0; j<src.cols; j++) {
+			basic_mat.at<uchar>(i, j) = img_basic[mm];
+			denoised_mat.at<uchar>(i, j) = img_denoised[mm];
+			mm += 1;
+		}
+	}
+
+	imwrite(argv[2], basic_mat);
     imwrite(argv[3], denoised_mat);
 
     cout << "done." << endl;

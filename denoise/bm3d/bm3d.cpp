@@ -263,7 +263,7 @@ void bm3d_1st_step(
 
             //! 3D weighting using Standard Deviation
             if (useSD)
-                sd_weighting(group_3D, nSx_r, kHard, chnls, weight_table);
+                sd_weighting(group_3D, nSx_r, kHard, weight_table[0]);
 
             //! Save the 3D group. The DCT 2D inverse will be done after.
             for (unsigned c = 0; c < chnls; c++)
@@ -442,11 +442,11 @@ void bm3d_2nd_step(
             //! Wiener filtering of the 3D group
             vector<float> weight_table(chnls);
             wiener_filtering_hadamard(group_3D_img, group_3D_est, tmp, nSx_r, kWien,
-                                            chnls, sigma_table, weight_table, !useSD);
+                                            sigma_table[0], weight_table[0], !useSD);
 
             //! 3D weighting using Standard Deviation
             if (useSD)
-                sd_weighting(group_3D_est, nSx_r, kWien, chnls, weight_table);
+                sd_weighting(group_3D_est, nSx_r, kWien, weight_table[0]);
 
             //! Save the 3D group. The DCT 2D inverse will be done after.
             for (unsigned c = 0; c < chnls; c++)
@@ -803,54 +803,46 @@ void wiener_filtering_hadamard(
 ,   vector<float> &tmp
 ,   const unsigned nSx_r
 ,   const unsigned kWien
-,   const unsigned chnls
-,   vector<float> const& sigma_table
-,   vector<float> &weight_table
+,   float const& sigma
+,   float &weight
 ,   const bool doWeight
 ){
     //! Declarations
     const unsigned kWien_2 = kWien * kWien;
     const float coef = 1.0f / (float) nSx_r;
-
-    for (unsigned c = 0; c < chnls; c++)
-        weight_table[c] = 0.0f;
+   	weight = 0.0f;
 
     //! Process the Welsh-Hadamard transform on the 3rd dimension
-    for (unsigned n = 0; n < kWien_2 * chnls; n++)
+    for (unsigned n = 0; n < kWien_2; n++)
     {
         hadamard_transform(group_3D_img, tmp, nSx_r, n * nSx_r);
         hadamard_transform(group_3D_est, tmp, nSx_r, n * nSx_r);
     }
 
     //! Wiener Filtering
-    for (unsigned c = 0; c < chnls; c++)
-    {
-        const unsigned dc = c * nSx_r * kWien_2;
 #ifdef DCWIENER
-		for (unsigned k = 0; k < kWien_2 * nSx_r; k++)
+	for (unsigned k = 0; k < kWien_2 * nSx_r; k++)
 #else
-        group_3D_est[dc] = group_3D_img[dc] * coef;
-        // Add the weight corresponding to the DC components that were not passed through the Wiener filter
-        weight_table[c] += 1; 
-        for (unsigned k = 1; k < kWien_2 * nSx_r; k++)
+	group_3D_est[0] = group_3D_img[0] * coef;
+	// Add the weight corresponding to the DC components that were not passed through the Wiener filter
+	weight += 1; 
+	for (unsigned k = 1; k < kWien_2 * nSx_r; k++)
 #endif
-		{
-			float value = group_3D_est[dc + k] * group_3D_est[dc + k] * coef;
-			value /= (value + sigma_table[c] * sigma_table[c]);
-			group_3D_est[k + dc] = group_3D_img[k + dc] * value * coef;
-			weight_table[c] += (value*value);
-		}
-    }
+	{
+		float value = group_3D_est[k] * group_3D_est[k] * coef;
+		value /= (value + sigma * sigma);
+		group_3D_est[k] = group_3D_img[k] * value * coef;
+		weight += (value*value);
+	}
 
     //! Process of the Welsh-Hadamard inverse transform
-    for (unsigned n = 0; n < kWien_2 * chnls; n++)
+    for (unsigned n = 0; n < kWien_2; n++)
         hadamard_transform(group_3D_est, tmp, nSx_r, n * nSx_r);
 
     //! Weight for aggregation
-    if (doWeight)
-        for (unsigned c = 0; c < chnls; c++)
-            weight_table[c] = (weight_table[c] > 0.0f ? 1.0f / (float)
-                    (sigma_table[c] * sigma_table[c] * weight_table[c]) : 1.0f);
+	if (doWeight)
+		weight = (weight > 0.0f ? 1.0f / (float)
+				(sigma * sigma * weight) : 1.0f);
 }
 
 /**
@@ -1171,28 +1163,23 @@ void sd_weighting(
     std::vector<float> const& group_3D
 ,   const unsigned nSx_r
 ,   const unsigned kHW
-,   const unsigned chnls
-,   std::vector<float> &weight_table
+,   float &weight
 ){
     const unsigned N = nSx_r * kHW * kHW;
 
-    for (unsigned c = 0; c < chnls; c++)
-    {
-        //! Initialization
-        float mean = 0.0f;
-        float std  = 0.0f;
+	//! Initialization
+	float mean = 0.0f;
+	float std  = 0.0f;
 
-        //! Compute the sum and the square sum
-        for (unsigned k = 0; k < N; k++)
-        {
-            mean += group_3D[k];
-            std  += group_3D[k] * group_3D[k];
-        }
+	//! Compute the sum and the square sum
+	for (unsigned k = 0; k < N; k++) {
+		mean += group_3D[k];
+		std  += group_3D[k] * group_3D[k];
+	}
 
-        //! Sample standard deviation (Bessel's correction)
-        float res = (std - mean * mean / (float) N) / (float) (N - 1);
+	//! Sample standard deviation (Bessel's correction)
+	float res = (std - mean * mean / (float) N) / (float) (N - 1);
 
-        //! Return the weight as used in the aggregation
-        weight_table[c] = (res > 0.0f ? 1.0f / sqrtf(res) : 0.0f);
-    }
+	//! Return the weight as used in the aggregation
+	weight = (res > 0.0f ? 1.0f / sqrtf(res) : 0.0f);
 }

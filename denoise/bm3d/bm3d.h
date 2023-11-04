@@ -136,9 +136,8 @@ void wiener_filtering_hadamard(
 ,   std::vector<float> &tmp
 ,   const unsigned nSx_r
 ,   const unsigned kWien
-,   const unsigned chnls
-,   std::vector<float> const& sigma_table
-,   std::vector<float> &weight_table
+,   float const& sigma
+,   float &weight
 ,   const bool doWeight
 );
 
@@ -147,8 +146,7 @@ void sd_weighting(
     std::vector<float> const& group_3D
 ,   const unsigned nSx_r
 ,   const unsigned kHW
-,   const unsigned chnls
-,   std::vector<float> &weight_table
+,   float &weight
 );
 
 //! Apply a bior1.5 spline wavelet on a vector of size N x N.
