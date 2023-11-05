@@ -39,7 +39,7 @@ bool ComparaisonFirst(pair<float,unsigned> pair1, pair<float,unsigned> pair2)
  * @param img_noisy: noisy image;
  * @param img_basic: will be the basic estimation after the 1st step
  * @param img_denoised: will be the denoised final image;
- * @param width, height, chnls: size of the image;
+ * @param width, height: size of the image;
  * @param useSD_h (resp. useSD_w): if true, use weight based
  *        on the standard variation of the 3D group for the
  *        first (resp. second) step, otherwise use the number
@@ -67,7 +67,6 @@ int run_bm3d(
 ,   const unsigned patch_size
 ){
     //! Parameters
-    const unsigned chnls = 1;
     const unsigned nHard = 16; //! Half size of the search window
     const unsigned nWien = 16; //! Half size of the search window
     const unsigned NHard = 16; //! Must be a power of 2
@@ -102,37 +101,30 @@ int run_bm3d(
             &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
 
     //! To avoid boundaries problem
-    for (unsigned c = 0; c < chnls; c++) {
-        const unsigned dc_b = c * w_b * h_b + nHard * w_b + nHard;
-        unsigned dc = c * width * height;
-        for (unsigned i = 0; i < height; i++)
-            for (unsigned j = 0; j < width; j++, dc++)
-                img_basic[dc] = img_sym_basic[dc_b + i * w_b + j];
-    }
-    symetrize(img_basic, img_sym_basic, width, height, nHard);
+	unsigned dc_b = nHard * w_b + nHard;
+	unsigned dc = 0;
+	for (unsigned i = 0; i < height; i++)
+		for (unsigned j = 0; j < width; j++, dc++)
+			img_basic[dc] = img_sym_basic[dc_b + i * w_b + j];
+
+	symetrize(img_basic, img_sym_basic, width, height, nHard);
 
     //! Allocating Plan for FFTW process
     const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
-    allocate_plan_2d(&plan_2d_for_1, kWien, FFTW_REDFT10,
-            w_b * (2 * nWien + 1) * chnls);
-    allocate_plan_2d(&plan_2d_for_2, kWien, FFTW_REDFT10,
-            w_b * pWien * chnls);
-    allocate_plan_2d(&plan_2d_inv, kWien, FFTW_REDFT01,
-            NWien * nb_cols * chnls);
+    allocate_plan_2d(&plan_2d_for_1, kWien, FFTW_REDFT10, w_b * (2 * nWien + 1));
+    allocate_plan_2d(&plan_2d_for_2, kWien, FFTW_REDFT10, w_b * pWien);
+    allocate_plan_2d(&plan_2d_inv, kWien, FFTW_REDFT01, NWien * nb_cols);
 
     //! Denoising, 2nd Step
     bm3d_2nd_step(sigma, img_sym_noisy, img_sym_basic, img_sym_denoised,
             w_b, h_b, nWien, kWien, NWien, pWien, useSD_w, &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
 
     //! Obtention of img_denoised
-    for (unsigned c = 0; c < chnls; c++)
-    {
-        const unsigned dc_b = c * w_b * h_b + nWien * w_b + nWien;
-        unsigned dc = c * width * height;
-        for (unsigned i = 0; i < height; i++)
-            for (unsigned j = 0; j < width; j++, dc++)
-                img_denoised[dc] = img_sym_denoised[dc_b + i * w_b + j];
-    }
+	dc_b = nWien * w_b + nWien;
+	dc = 0;
+	for (unsigned i = 0; i < height; i++)
+		for (unsigned j = 0; j < width; j++, dc++)
+			img_denoised[dc] = img_sym_denoised[dc_b + i * w_b + j];
 
     //! Free Memory
     fftwf_destroy_plan(plan_2d_for_1);
@@ -152,7 +144,7 @@ int run_bm3d(
  * @param sigma: value of assumed noise of the image to denoise;
  * @param img_noisy: noisy image;
  * @param img_basic: will contain the denoised image after the 1st step;
- * @param width, height, chnls : size of img_noisy;
+ * @param width, height: size of img_noisy;
  * @param nHard: size of the boundary around img_noisy;
  * @param useSD: if true, use weight based on the standard variation
  *        of the 3D group for the first step, otherwise use the number
@@ -310,7 +302,7 @@ void bm3d_1st_step(
  * @param img_basic: contains the denoised image after the 1st step;
  * @param img_denoised: will contain the final estimate of the denoised
  *        image after the second step;
- * @param width, height, chnls : size of img_noisy;
+ * @param width, height: size of img_noisy;
  * @param nWien: size of the boundary around img_noisy;
  * @param useSD: if true, use weight based on the standard variation
  *        of the 3D group for the second step, otherwise use the norm
@@ -474,7 +466,7 @@ void bm3d_2nd_step(
  * @param img : image on which the 2d DCT will be processed;
  * @param plan_1, plan_2 : for convenience. Used by fftw;
  * @param nHW : size of the boundary around img;
- * @param width, height, chnls: size of img;
+ * @param width, height: size of img;
  * @param kHW : size of patches (kHW x kHW);
  * @param i_r: current index of the reference patches;
  * @param step: space in pixels between two references patches;
@@ -575,7 +567,7 @@ void dct_2d_process(
  *        chosen patches;
  * @param img : image on which the 2d transform will be processed;
  * @param nHW : size of the boundary around img;
- * @param width, height, chnls: size of img;
+ * @param width, height: size of img;
  * @param kHW : size of patches (kHW x kHW). MUST BE A POWER OF 2 !!!
  * @param i_r: current index of the reference patches;
  * @param step: space in pixels between two references patches;
@@ -645,7 +637,6 @@ void bior_2d_process(
  * @param tmp: allocated vector used in Hadamard transform for convenience;
  * @param nSx_r : number of similar patches to a reference one;
  * @param kHW : size of patches (kHW x kHW);
- * @param chnls : number of channels of the image;
  * @param sigma_table : contains value of noise for each channel;
  * @param lambdaHard3D : value of thresholding;
  * @param weight_table: the weighting of this 3D group for each channel;
@@ -708,7 +699,6 @@ void ht_filtering_hadamard(
  * @param tmp: allocated vector used in hadamard transform for convenience;
  * @param nSx_r : number of similar patches to a reference one;
  * @param kWien : size of patches (kWien x kWien);
- * @param chnls : number of channels of the image;
  * @param sigma_table : contains value of noise for each channel;
  * @param weight_table: the weighting of this 3D group for each channel;
  * @param doWeight: if true process the weighting, do nothing
@@ -1072,7 +1062,6 @@ void precompute_BM(
  * @param group_3D : 3D group
  * @param nSx_r : number of similar patches in the 3D group
  * @param kHW: size of patches
- * @param chnls: number of channels in the image
  * @param weight_table: will contain the weighting for each
  *        channel.
  *
