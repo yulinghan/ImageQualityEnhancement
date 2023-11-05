@@ -34,7 +34,6 @@ void bm3d_1st_step(
 ,   std::vector<float> &img_basic
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned nHard
 ,   const unsigned kHard
 ,   const unsigned NHard
@@ -53,7 +52,6 @@ void bm3d_2nd_step(
 ,   std::vector<float> &img_denoised
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned nWien
 ,   const unsigned kWien
 ,   const unsigned NWien
