@@ -229,7 +229,7 @@ void bm3d_1st_step(
         const unsigned i_r = row_ind[ind_i];
 
         //! Update of table_2D
-        bior_2d_process(table_2D, img_noisy, nHard, width, height, chnls,
+        bior_2d_process(table_2D, img_noisy, nHard, width, height,
                 kHard, i_r, pHard, row_ind[0], row_ind.back(), lpd, hpd);
 
         wx_r_table.clear();
@@ -258,8 +258,8 @@ void bm3d_1st_step(
 
             //! HT filtering of the 3D group
             vector<float> weight_table(chnls);
-            ht_filtering_hadamard(group_3D, hadamard_tmp, nSx_r, kHard, chnls, sigma_table,
-                                                    lambdaHard3D, weight_table, !useSD);
+            ht_filtering_hadamard(group_3D, hadamard_tmp, nSx_r, kHard, sigma_table[0],
+                                                    lambdaHard3D, weight_table[0], !useSD);
 
             //! 3D weighting using Standard Deviation
             if (useSD)
@@ -404,10 +404,10 @@ void bm3d_2nd_step(
 
         //! Update of DCT_table_2D
         dct_2d_process(table_2D_img, img_noisy, plan_2d_for_1, plan_2d_for_2,
-                nWien, width, height, chnls, kWien, i_r, pWien, coef_norm,
+                nWien, width, height, kWien, i_r, pWien, coef_norm,
                 row_ind[0], row_ind.back());
         dct_2d_process(table_2D_est, img_basic, plan_2d_for_1, plan_2d_for_2,
-                nWien, width, height, chnls, kWien, i_r, pWien, coef_norm,
+                nWien, width, height, kWien, i_r, pWien, coef_norm,
                 row_ind[0], row_ind.back());
 
         wx_r_table.clear();
@@ -526,7 +526,6 @@ void dct_2d_process(
 ,   const unsigned nHW
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned kHW
 ,   const unsigned i_r
 ,   const unsigned step
@@ -536,7 +535,7 @@ void dct_2d_process(
 ){
     //! Declarations
     const unsigned kHW_2 = kHW * kHW;
-    const unsigned size = chnls * kHW_2 * width * (2 * nHW + 1);
+    const unsigned size  = kHW_2 * width * (2 * nHW + 1);
 
     //! If i_r == ns, then we have to process all DCT
     if (i_r == i_min || i_r == i_max)
@@ -545,33 +544,24 @@ void dct_2d_process(
         float* vec = (float*) fftwf_malloc(size * sizeof(float));
         float* dct = (float*) fftwf_malloc(size * sizeof(float));
 
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            const unsigned dc = c * width * height;
-            const unsigned dc_p = c * kHW_2 * width * (2 * nHW + 1);
-            for (unsigned i = 0; i < 2 * nHW + 1; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                    for (unsigned p = 0; p < kHW; p++)
-                        for (unsigned q = 0; q < kHW; q++)
-                            vec[p * kHW + q + dc_p + (i * width + j) * kHW_2] =
-                                img[dc + (i_r + i - nHW + p) * width + j + q];
-        }
+		for (unsigned i = 0; i < 2 * nHW + 1; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+				for (unsigned p = 0; p < kHW; p++)
+					for (unsigned q = 0; q < kHW; q++)
+						vec[p * kHW + q + (i * width + j) * kHW_2] =
+							img[(i_r + i - nHW + p) * width + j + q];
 
         //! Process of all DCTs
         fftwf_execute_r2r(*plan_1, vec, dct);
         fftwf_free(vec);
 
         //! Getting the result
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            const unsigned dc   = c * kHW_2 * width * (2 * nHW + 1);
-            const unsigned dc_p = c * kHW_2 * width * (2 * nHW + 1);
-            for (unsigned i = 0; i < 2 * nHW + 1; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                    for (unsigned k = 0; k < kHW_2; k++)
-                        DCT_table_2D[dc + (i * width + j) * kHW_2 + k] =
-                            dct[dc_p + (i * width + j) * kHW_2 + k] * coef_norm[k];
-        }
+		for (unsigned i = 0; i < 2 * nHW + 1; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+				for (unsigned k = 0; k < kHW_2; k++)
+					DCT_table_2D[(i * width + j) * kHW_2 + k] =
+						dct[(i * width + j) * kHW_2 + k] * coef_norm[k];
+
         fftwf_free(dct);
     }
     else
@@ -579,49 +569,35 @@ void dct_2d_process(
         const unsigned ds = step * width * kHW_2;
 
         //! Re-use of DCT already processed
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            unsigned dc = c * width * (2 * nHW + 1) * kHW_2;
-            for (unsigned i = 0; i < 2 * nHW + 1 - step; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                    for (unsigned k = 0; k < kHW_2; k++)
-                        DCT_table_2D[k + (i * width + j) * kHW_2 + dc] =
-                            DCT_table_2D[k + (i * width + j) * kHW_2 + dc + ds];
-        }
+		for (unsigned i = 0; i < 2 * nHW + 1 - step; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+				for (unsigned k = 0; k < kHW_2; k++)
+					DCT_table_2D[k + (i * width + j) * kHW_2] =
+						DCT_table_2D[k + (i * width + j) * kHW_2 + ds];
 
         //! Compute the new DCT
-        float* vec = (float*) fftwf_malloc(chnls * kHW_2 * step * width * sizeof(float));
-        float* dct = (float*) fftwf_malloc(chnls * kHW_2 * step * width * sizeof(float));
+        float* vec = (float*) fftwf_malloc(kHW_2 * step * width * sizeof(float));
+        float* dct = (float*) fftwf_malloc(kHW_2 * step * width * sizeof(float));
 
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            const unsigned dc   = c * width * height;
-            const unsigned dc_p = c * kHW_2 * width * step;
-            for (unsigned i = 0; i < step; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                    for (unsigned p = 0; p < kHW; p++)
-                        for (unsigned q = 0; q < kHW; q++)
-                            vec[p * kHW + q + dc_p + (i * width + j) * kHW_2] =
-                                        img[(p + i + 2 * nHW + 1 - step + i_r - nHW)
-                                                            * width + j + q + dc];
-        }
+		for (unsigned i = 0; i < step; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+				for (unsigned p = 0; p < kHW; p++)
+					for (unsigned q = 0; q < kHW; q++)
+						vec[p * kHW + q + (i * width + j) * kHW_2] =
+							img[(p + i + 2 * nHW + 1 - step + i_r - nHW)
+							* width + j + q];
 
         //! Process of all DCTs
         fftwf_execute_r2r(*plan_2, vec, dct);
         fftwf_free(vec);
 
         //! Getting the result
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            const unsigned dc   = c * kHW_2 * width * (2 * nHW + 1);
-            const unsigned dc_p = c * kHW_2 * width * step;
-            for (unsigned i = 0; i < step; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                    for (unsigned k = 0; k < kHW_2; k++)
-                        DCT_table_2D[dc + ((i + 2 * nHW + 1 - step) * width + j) * kHW_2 + k] =
-                            dct[dc_p + (i * width + j) * kHW_2 + k] * coef_norm[k];
-        }
-        fftwf_free(dct);
+		for (unsigned i = 0; i < step; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+				for (unsigned k = 0; k < kHW_2; k++)
+					DCT_table_2D[((i + 2 * nHW + 1 - step) * width + j) * kHW_2 + k] =
+						dct[(i * width + j) * kHW_2 + k] * coef_norm[k];
+		fftwf_free(dct);
     }
 }
 
@@ -650,7 +626,6 @@ void bior_2d_process(
 ,   const unsigned nHW
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned kHW
 ,   const unsigned i_r
 ,   const unsigned step
@@ -665,49 +640,35 @@ void bior_2d_process(
     //! If i_r == ns, then we have to process all Bior1.5 transforms
     if (i_r == i_min || i_r == i_max)
     {
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            const unsigned dc = c * width * height;
-            const unsigned dc_p = c * kHW_2 * width * (2 * nHW + 1);
-            for (unsigned i = 0; i < 2 * nHW + 1; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                {
-                    bior_2d_forward(img, bior_table_2D, kHW, dc +
-                             (i_r + i - nHW) * width + j, width,
-                             dc_p + (i * width + j) * kHW_2, lpd, hpd);
-                }
-        }
-    }
+		for (unsigned i = 0; i < 2 * nHW + 1; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+			{
+				bior_2d_forward(img, bior_table_2D, kHW,
+						(i_r + i - nHW) * width + j, width,
+						(i * width + j) * kHW_2, lpd, hpd);
+			}
+	}
     else
     {
         const unsigned ds = step * width * kHW_2;
 
         //! Re-use of Bior1.5 already processed
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            unsigned dc = c * width * (2 * nHW + 1) * kHW_2;
-            for (unsigned i = 0; i < 2 * nHW + 1 - step; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                    for (unsigned k = 0; k < kHW_2; k++)
-                        bior_table_2D[k + (i * width + j) * kHW_2 + dc] =
-                            bior_table_2D[k + (i * width + j) * kHW_2 + dc + ds];
-        }
+		for (unsigned i = 0; i < 2 * nHW + 1 - step; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+				for (unsigned k = 0; k < kHW_2; k++)
+					bior_table_2D[k + (i * width + j) * kHW_2] =
+						bior_table_2D[k + (i * width + j) * kHW_2 + ds];
 
         //! Compute the new Bior
-        for (unsigned c = 0; c < chnls; c++)
-        {
-            const unsigned dc   = c * width * height;
-            const unsigned dc_p = c * kHW_2 * width * (2 * nHW + 1);
-            for (unsigned i = 0; i < step; i++)
-                for (unsigned j = 0; j < width - kHW; j++)
-                {
-                    bior_2d_forward(img, bior_table_2D, kHW, dc +
-                             (i + 2 * nHW + 1 - step + i_r - nHW) * width + j,
-                             width, dc_p + ((i + 2 * nHW + 1 - step)
-                             * width + j) * kHW_2, lpd, hpd);
-                }
-        }
-    }
+		for (unsigned i = 0; i < step; i++)
+			for (unsigned j = 0; j < width - kHW; j++)
+			{
+				bior_2d_forward(img, bior_table_2D, kHW,
+						(i + 2 * nHW + 1 - step + i_r - nHW) * width + j,
+						width, ((i + 2 * nHW + 1 - step)
+							* width + j) * kHW_2, lpd, hpd);
+			}
+	}
 }
 
 /**
@@ -732,43 +693,37 @@ void ht_filtering_hadamard(
 ,   vector<float> &tmp
 ,   const unsigned nSx_r
 ,   const unsigned kHard
-,   const unsigned chnls
-,   vector<float> const& sigma_table
+,   float const& sigma
 ,   const float lambdaHard3D
-,   vector<float> &weight_table
+,   float &weight
 ,   const bool doWeight
 ){
     //! Declarations
     const unsigned kHard_2 = kHard * kHard;
-    for (unsigned c = 0; c < chnls; c++)
-        weight_table[c] = 0.0f;
+    weight = 0.0f;
     const float coef_norm = sqrtf((float) nSx_r);
     const float coef = 1.0f / (float) nSx_r;
 
     //! Process the Welsh-Hadamard transform on the 3rd dimension
-    for (unsigned n = 0; n < kHard_2 * chnls; n++)
+    for (unsigned n = 0; n < kHard_2; n++)
         hadamard_transform(group_3D, tmp, nSx_r, n * nSx_r);
 
     //! Hard Thresholding
-    for (unsigned c = 0; c < chnls; c++)
-    {
-        const unsigned dc = c * nSx_r * kHard_2;
-        const float T = lambdaHard3D * sigma_table[c] * coef_norm;
-        for (unsigned k = 0; k < kHard_2 * nSx_r; k++)
-        {
+	const float T = lambdaHard3D * sigma * coef_norm;
+	for (unsigned k = 0; k < kHard_2 * nSx_r; k++)
+	{
 #ifdef DCTHRESH
-            if (fabs(group_3D[k + dc]) > T)
+		if (fabs(group_3D[k]) > T)
 #else
-            if (k < 1 || fabs(group_3D[k + dc]) > T)
+		if (k < 1 || fabs(group_3D[k]) > T)
 #endif
-                weight_table[c]++;
-            else
-                group_3D[k + dc] = 0.0f;
-        }
-    }
+			weight++;
+		else
+			group_3D[k] = 0.0f;
+	}
 
     //! Process of the Welsh-Hadamard inverse transform
-    for (unsigned n = 0; n < kHard_2 * chnls; n++)
+    for (unsigned n = 0; n < kHard_2; n++)
         hadamard_transform(group_3D, tmp, nSx_r, n * nSx_r);
 
     for (unsigned k = 0; k < group_3D.size(); k++)
@@ -776,9 +731,7 @@ void ht_filtering_hadamard(
 
     //! Weight for aggregation
     if (doWeight)
-        for (unsigned c = 0; c < chnls; c++)
-            weight_table[c] = (weight_table[c] > 0.0f ? 1.0f / (float)
-                    (sigma_table[c] * sigma_table[c] * weight_table[c]) : 1.0f);
+    	weight = (weight > 0.0f ? 1.0f / (float)(sigma * sigma * weight) : 1.0f);
 }
 
 /**

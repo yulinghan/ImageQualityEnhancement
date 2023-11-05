@@ -73,7 +73,6 @@ void dct_2d_process(
 ,   const unsigned nHW
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned kHW
 ,   const unsigned i_r
 ,   const unsigned step
@@ -89,7 +88,6 @@ void bior_2d_process(
 ,   const unsigned nHW
 ,   const unsigned width
 ,   const unsigned height
-,   const unsigned chnls
 ,   const unsigned kHW
 ,   const unsigned i_r
 ,   const unsigned step
@@ -122,10 +120,9 @@ void ht_filtering_hadamard(
 ,   std::vector<float> &tmp
 ,   const unsigned nSx_r
 ,   const unsigned kHard
-,   const unsigned chnls
-,   std::vector<float> const& sigma_table
+,   float const& sigma
 ,   const float lambdaThr3D
-,   std::vector<float> &weight_table
+,   float &weight
 ,   const bool doWeight
 );
 
