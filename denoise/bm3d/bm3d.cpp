@@ -4,7 +4,6 @@
 
 #include "bm3d.h"
 #include "utilities.h"
-#include "lib_transforms.h"
 
 #define SQRT2     1.414213562373095
 #define SQRT2_INV 0.7071067811865475
@@ -95,6 +94,14 @@ int run_bm3d(
     vector<float> img_sym_noisy, img_sym_basic, img_sym_denoised;
     symetrize(img_noisy, img_sym_noisy, width, height, nHard);
 
+    {
+        //! Allocating Plan for FFTW process
+        const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
+        allocate_plan_2d(&plan_2d_for_1, kHard, FFTW_REDFT10, w_b * (2 * nHard + 1));
+        allocate_plan_2d(&plan_2d_for_2, kHard, FFTW_REDFT10, w_b * pHard);
+        allocate_plan_2d(&plan_2d_inv, kHard, FFTW_REDFT01, NHard * nb_cols);
+    }
+
     //! Denoising, 1st Step
     bm3d_1st_step(sigma, img_sym_noisy, img_sym_basic, w_b, h_b, nHard,
             kHard, NHard, pHard, useSD_h,
@@ -109,11 +116,13 @@ int run_bm3d(
 
 	symetrize(img_basic, img_sym_basic, width, height, nHard);
 
-    //! Allocating Plan for FFTW process
-    const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
-    allocate_plan_2d(&plan_2d_for_1, kWien, FFTW_REDFT10, w_b * (2 * nWien + 1));
-    allocate_plan_2d(&plan_2d_for_2, kWien, FFTW_REDFT10, w_b * pWien);
-    allocate_plan_2d(&plan_2d_inv, kWien, FFTW_REDFT01, NWien * nb_cols);
+    {
+        //! Allocating Plan for FFTW process
+        const unsigned nb_cols = ind_size(w_b - kWien + 1, nWien, pWien);
+        allocate_plan_2d(&plan_2d_for_1, kWien, FFTW_REDFT10, w_b * (2 * nWien + 1));
+        allocate_plan_2d(&plan_2d_for_2, kWien, FFTW_REDFT10, w_b * pWien);
+        allocate_plan_2d(&plan_2d_inv, kWien, FFTW_REDFT01, NWien * nb_cols);
+    }
 
     //! Denoising, 2nd Step
     bm3d_2nd_step(sigma, img_sym_noisy, img_sym_basic, img_sym_denoised,
@@ -195,10 +204,6 @@ void bm3d_1st_step(
     vector<float> coef_norm_inv(kHard_2);
     preProcess(kaiser_window, coef_norm, coef_norm_inv, kHard);
 
-    //! Preprocessing of Bior table
-    vector<float> lpd, hpd, lpr, hpr;
-    bior15_coef(lpd, hpd, lpr, hpr);
-
     //! For aggregation part
     vector<float> denominator(width * height, 0.0f);
     vector<float> numerator  (width * height, 0.0f);
@@ -214,9 +219,9 @@ void bm3d_1st_step(
     {
         const unsigned i_r = row_ind[ind_i];
 
-        //! Update of table_2D
-        bior_2d_process(table_2D, img_noisy, nHard, width, height,
-                kHard, i_r, pHard, row_ind[0], row_ind.back(), lpd, hpd);
+        dct_2d_process(table_2D, img_noisy, plan_2d_for_1, plan_2d_for_2, nHard,
+                width, height, kHard, i_r, pHard, coef_norm,
+                row_ind[0], row_ind.back());
 
         wx_r_table.clear();
         group_3D_table.clear();
@@ -260,7 +265,8 @@ void bm3d_1st_step(
         } //! End of loop on j_r
 
         //!  Apply 2D inverse transform
-        bior_2d_inverse(group_3D_table, kHard, lpr, hpr);
+        dct_2d_inverse(group_3D_table, kHard, NHard * column_ind.size(),
+                           coef_norm_inv, plan_2d_inv);
 
         //! Registration of the weighted estimation
         unsigned dec = 0;
@@ -358,10 +364,6 @@ void bm3d_2nd_step(
     //! Precompute Bloc-Matching
     vector<vector<unsigned> > patch_table;
     precompute_BM(patch_table, img_basic, width, height, kWien, NWien, nWien, pWien, tauMatch);
-
-    //! Preprocessing of Bior table
-    vector<float> lpd, hpd, lpr, hpr;
-    bior15_coef(lpd, hpd, lpr, hpr);
 
     vector<float> table_2D_img((2 * nWien + 1) * width * kWien_2, 0.0f);
     vector<float> table_2D_est((2 * nWien + 1) * width * kWien_2, 0.0f);
@@ -560,76 +562,6 @@ void dct_2d_process(
 }
 
 /**
- * @brief Precompute a 2D bior1.5 transform on all patches contained in
- *        a part of the image.
- *
- * @param bior_table_2D : will contain the 2d bior1.5 transform for all
- *        chosen patches;
- * @param img : image on which the 2d transform will be processed;
- * @param nHW : size of the boundary around img;
- * @param width, height: size of img;
- * @param kHW : size of patches (kHW x kHW). MUST BE A POWER OF 2 !!!
- * @param i_r: current index of the reference patches;
- * @param step: space in pixels between two references patches;
- * @param i_min (resp. i_max) : minimum (resp. maximum) value
- *        for i_r. In this case the whole 2d transform is applied
- *        on every patches. Otherwise the precomputed 2d DCT is re-used
- *        without processing it;
- * @param lpd : low pass filter of the forward bior1.5 2d transform;
- * @param hpd : high pass filter of the forward bior1.5 2d transform.
- **/
-void bior_2d_process(
-    vector<float> &bior_table_2D
-,   vector<float> const& img
-,   const unsigned nHW
-,   const unsigned width
-,   const unsigned height
-,   const unsigned kHW
-,   const unsigned i_r
-,   const unsigned step
-,   const unsigned i_min
-,   const unsigned i_max
-,   vector<float> &lpd
-,   vector<float> &hpd
-){
-    //! Declarations
-    const unsigned kHW_2 = kHW * kHW;
-
-    //! If i_r == ns, then we have to process all Bior1.5 transforms
-    if (i_r == i_min || i_r == i_max)
-    {
-		for (unsigned i = 0; i < 2 * nHW + 1; i++)
-			for (unsigned j = 0; j < width - kHW; j++)
-			{
-				bior_2d_forward(img, bior_table_2D, kHW,
-						(i_r + i - nHW) * width + j, width,
-						(i * width + j) * kHW_2, lpd, hpd);
-			}
-	}
-    else
-    {
-        const unsigned ds = step * width * kHW_2;
-
-        //! Re-use of Bior1.5 already processed
-		for (unsigned i = 0; i < 2 * nHW + 1 - step; i++)
-			for (unsigned j = 0; j < width - kHW; j++)
-				for (unsigned k = 0; k < kHW_2; k++)
-					bior_table_2D[k + (i * width + j) * kHW_2] =
-						bior_table_2D[k + (i * width + j) * kHW_2 + ds];
-
-        //! Compute the new Bior
-		for (unsigned i = 0; i < step; i++)
-			for (unsigned j = 0; j < width - kHW; j++)
-			{
-				bior_2d_forward(img, bior_table_2D, kHW,
-						(i + 2 * nHW + 1 - step + i_r - nHW) * width + j,
-						width, ((i + 2 * nHW + 1 - step)
-							* width + j) * kHW_2, lpd, hpd);
-			}
-	}
-}
-
-/**
  * @brief HT filtering using Welsh-Hadamard transform (do only third
  *        dimension transform, Hard Thresholding and inverse transform).
  *
@@ -798,36 +730,6 @@ void dct_2d_inverse(
     fftwf_free(vec);
 }
 
-void bior_2d_inverse(
-    vector<float> &group_3D_table
-,   const unsigned kHW
-,   vector<float> const& lpr
-,   vector<float> const& hpr
-){
-    //! Declarations
-    const unsigned kHW_2 = kHW * kHW;
-    const unsigned N = group_3D_table.size() / kHW_2;
-
-    //! Bior process
-    for (unsigned n = 0; n < N; n++)
-        bior_2d_inverse(group_3D_table, kHW, n * kHW_2, lpr, hpr);
-}
-
-/** ----------------- **/
-/** - Preprocessing - **/
-/** ----------------- **/
-/**
- * @brief Preprocess
- *
- * @param kaiser_window[kHW * kHW]: Will contain values of a Kaiser Window;
- * @param coef_norm: Will contain values used to normalize the 2D DCT;
- * @param coef_norm_inv: Will contain values used to normalize the 2D DCT;
- * @param bior1_5_for: will contain coefficients for the bior1.5 forward transform
- * @param bior1_5_inv: will contain coefficients for the bior1.5 inverse transform
- * @param kHW: size of patches (need to be 8 or 12).
- *
- * @return none.
- **/
 void preProcess(
     vector<float> &kaiserWindow
 ,   vector<float> &coef_norm
@@ -1090,4 +992,48 @@ void sd_weighting(
 
 	//! Return the weight as used in the aggregation
 	weight = (res > 0.0f ? 1.0f / sqrtf(res) : 0.0f);
+}
+
+/**
+ * @brief Apply Welsh-Hadamard transform on vec (non normalized !!)
+ *
+ * @param vec: vector on which a Hadamard transform will be applied.
+ *        It will contain the transform at the end;
+ * @param tmp: must have the same size as vec. Used for convenience;
+ * @param N, d: the Hadamard transform will be applied on vec[d] -> vec[d + N].
+ *        N must be a power of 2!!!!
+ *
+ * @return None.
+ **/
+void hadamard_transform(
+    vector<float> &vec
+,   vector<float> &tmp
+,   const unsigned N
+,   const unsigned D
+){
+    if (N == 1)
+        return;
+    else if (N == 2)
+    {
+        const float a = vec[D + 0];
+        const float b = vec[D + 1];
+        vec[D + 0] = a + b;
+        vec[D + 1] = a - b;
+    }
+    else
+    {
+        const unsigned n = N / 2;
+        for (unsigned k = 0; k < n; k++)
+        {
+            const float a = vec[D + 2 * k];
+            const float b = vec[D + 2 * k + 1];
+            vec[D + k] = a + b;
+            tmp[k] = a - b;
+        }
+        for (unsigned k = 0; k < n; k++)
+            vec[D + n + k] = tmp[k];
+
+        hadamard_transform(vec, tmp, n, D);
+        hadamard_transform(vec, tmp, n, D + n);
+    }
 }

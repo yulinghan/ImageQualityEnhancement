@@ -4,13 +4,6 @@
 #include <fftw3.h>
 #include <vector>
 
-#ifdef _OPENMP
-    #include <omp.h>
-    #define _NO_OPENMP 0
-#else
-    #define _NO_OPENMP 1
-#endif
-
 /** ------------------ **/
 /** - Main functions - **/
 /** ------------------ **/
@@ -177,6 +170,13 @@ void precompute_BM(
 ,   const unsigned n
 ,   const unsigned pHW
 ,   const float    tauMatch
+);
+
+void hadamard_transform(
+    std::vector<float> &vec
+,   std::vector<float> &tmp
+,   const unsigned N
+,   const unsigned D
 );
 
 #endif // BM3D_H_INCLUDED
