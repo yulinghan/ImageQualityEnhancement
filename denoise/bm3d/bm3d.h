@@ -15,8 +15,6 @@ int run_bm3d(
 ,   std::vector<float> &img_denoised
 ,   const unsigned width
 ,   const unsigned height
-,   const bool useSD_h
-,   const bool useSD_w
 ,   const unsigned patch_size = 0
 );
 
@@ -31,7 +29,6 @@ void bm3d_1st_step(
 ,   const unsigned kHard
 ,   const unsigned NHard
 ,   const unsigned pHard
-,   const bool     useSD
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
@@ -49,7 +46,6 @@ void bm3d_2nd_step(
 ,   const unsigned kWien
 ,   const unsigned NWien
 ,   const unsigned pWien
-,   const bool     useSD
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
@@ -72,35 +68,12 @@ void dct_2d_process(
 ,   const unsigned i_max
 );
 
-//! Process 2D bior1.5 transform of a group of patches
-void bior_2d_process(
-    std::vector<float> &bior_table_2D
-,   std::vector<float> const& img
-,   const unsigned nHW
-,   const unsigned width
-,   const unsigned height
-,   const unsigned kHW
-,   const unsigned i_r
-,   const unsigned step
-,   const unsigned i_min
-,   const unsigned i_max
-,   std::vector<float> &lpd
-,   std::vector<float> &hpd
-);
-
 void dct_2d_inverse(
     std::vector<float> &group_3D_table
 ,   const unsigned kHW
 ,   const unsigned N
 ,   std::vector<float> const& coef_norm_inv
 ,   fftwf_plan * plan
-);
-
-void bior_2d_inverse(
-    std::vector<float> &group_3D_table
-,   const unsigned kHW
-,   std::vector<float> const& lpr
-,   std::vector<float> const& hpr
 );
 
 //! HT filtering using Welsh-Hadamard transform (do only
@@ -114,7 +87,6 @@ void ht_filtering_hadamard(
 ,   float const& sigma
 ,   const float lambdaThr3D
 ,   float &weight
-,   const bool doWeight
 );
 
 //! Wiener filtering using Welsh-Hadamard transform
@@ -126,27 +98,6 @@ void wiener_filtering_hadamard(
 ,   const unsigned kWien
 ,   float const& sigma
 ,   float &weight
-,   const bool doWeight
-);
-
-//! Compute weighting using Standard Deviation
-void sd_weighting(
-    std::vector<float> const& group_3D
-,   const unsigned nSx_r
-,   const unsigned kHW
-,   float &weight
-);
-
-//! Apply a bior1.5 spline wavelet on a vector of size N x N.
-void bior1_5_transform(
-    std::vector<float> const& input
-,   std::vector<float> &output
-,   const unsigned N
-,   std::vector<float> const& bior_table
-,   const unsigned d_i
-,   const unsigned d_o
-,   const unsigned N_i
-,   const unsigned N_o
 );
 
 /** ---------------------------------- **/

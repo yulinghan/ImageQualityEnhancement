@@ -28,8 +28,6 @@ using namespace cv;
 int main(int argc, char **argv)
 {
     //! Variables initialization
-    const bool useSD_1 = true;
-    const bool useSD_2 = true;
     const int patch_size = 8;
     float fSigma = 30;
 
@@ -49,8 +47,7 @@ int main(int argc, char **argv)
 	}
 
     //! Denoising
-    if (run_bm3d(fSigma, img_noisy, img_basic, img_denoised, width, height,
-                useSD_1, useSD_2, patch_size) != EXIT_SUCCESS)
+    if (run_bm3d(fSigma, img_noisy, img_basic, img_denoised, width, height, patch_size) != EXIT_SUCCESS)
         return EXIT_FAILURE;
 
     cout << endl << "Save images...";

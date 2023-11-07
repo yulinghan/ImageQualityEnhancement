@@ -39,11 +39,6 @@ bool ComparaisonFirst(pair<float,unsigned> pair1, pair<float,unsigned> pair2)
  * @param img_basic: will be the basic estimation after the 1st step
  * @param img_denoised: will be the denoised final image;
  * @param width, height: size of the image;
- * @param useSD_h (resp. useSD_w): if true, use weight based
- *        on the standard variation of the 3D group for the
- *        first (resp. second) step, otherwise use the number
- *        of non-zero coefficients after Hard Thresholding
- *        (resp. the norm of Wiener coefficients);
  * @param tau_2D_hard (resp. tau_2D_wien): 2D transform to apply
  *        on every 3D group for the first (resp. second) part.
  *        Allowed values are DCT and BIOR;
@@ -61,8 +56,6 @@ int run_bm3d(
 ,   vector<float> &img_denoised
 ,   const unsigned width
 ,   const unsigned height
-,   const bool useSD_h
-,   const bool useSD_w
 ,   const unsigned patch_size
 ){
     //! Parameters
@@ -104,8 +97,7 @@ int run_bm3d(
 
     //! Denoising, 1st Step
     bm3d_1st_step(sigma, img_sym_noisy, img_sym_basic, w_b, h_b, nHard,
-            kHard, NHard, pHard, useSD_h,
-            &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
+            kHard, NHard, pHard, &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
 
     //! To avoid boundaries problem
 	unsigned dc_b = nHard * w_b + nHard;
@@ -126,7 +118,7 @@ int run_bm3d(
 
     //! Denoising, 2nd Step
     bm3d_2nd_step(sigma, img_sym_noisy, img_sym_basic, img_sym_denoised,
-            w_b, h_b, nWien, kWien, NWien, pWien, useSD_w, &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
+            w_b, h_b, nWien, kWien, NWien, pWien, &plan_2d_for_1, &plan_2d_for_2, &plan_2d_inv);
 
     //! Obtention of img_denoised
 	dc_b = nWien * w_b + nWien;
@@ -155,9 +147,6 @@ int run_bm3d(
  * @param img_basic: will contain the denoised image after the 1st step;
  * @param width, height: size of img_noisy;
  * @param nHard: size of the boundary around img_noisy;
- * @param useSD: if true, use weight based on the standard variation
- *        of the 3D group for the first step, otherwise use the number
- *        of non-zero coefficients after Hard-thresholding;
  * @param tau_2D: DCT or BIOR;
  * @param plan_2d_for_1, plan_2d_for_2, plan_2d_inv : for convenience. Used
  *        by fftw.
@@ -174,7 +163,6 @@ void bm3d_1st_step(
 ,   const unsigned kHard
 ,   const unsigned NHard
 ,   const unsigned pHard
-,   const bool     useSD
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
@@ -248,11 +236,7 @@ void bm3d_1st_step(
             //! HT filtering of the 3D group
             float weight;
             ht_filtering_hadamard(group_3D, hadamard_tmp, nSx_r, kHard, sigma,
-                                                    lambdaHard3D, weight, !useSD);
-
-            //! 3D weighting using Standard Deviation
-            if (useSD)
-                sd_weighting(group_3D, nSx_r, kHard, weight);
+                                                    lambdaHard3D, weight);
 
             //! Save the 3D group. The DCT 2D inverse will be done after.
 			for (unsigned n = 0; n < nSx_r; n++)
@@ -310,7 +294,6 @@ void bm3d_1st_step(
  *        image after the second step;
  * @param width, height: size of img_noisy;
  * @param nWien: size of the boundary around img_noisy;
- * @param useSD: if true, use weight based on the standard variation
  *        of the 3D group for the second step, otherwise use the norm
  *        of Wiener coefficients of the 3D group;
  * @param tau_2D: DCT or BIOR.
@@ -328,7 +311,6 @@ void bm3d_2nd_step(
 ,   const unsigned kWien
 ,   const unsigned NWien
 ,   const unsigned pWien
-,   const bool     useSD
 ,   fftwf_plan *  plan_2d_for_1
 ,   fftwf_plan *  plan_2d_for_2
 ,   fftwf_plan *  plan_2d_inv
@@ -410,11 +392,7 @@ void bm3d_2nd_step(
             //! Wiener filtering of the 3D group
             float weight;
             wiener_filtering_hadamard(group_3D_img, group_3D_est, tmp, nSx_r, kWien,
-                                            sigma, weight, !useSD);
-
-            //! 3D weighting using Standard Deviation
-            if (useSD)
-                sd_weighting(group_3D_est, nSx_r, kWien, weight);
+                                            sigma, weight);
 
             //! Save the 3D group. The DCT 2D inverse will be done after.
 			for (unsigned n = 0; n < nSx_r; n++)
@@ -585,7 +563,6 @@ void ht_filtering_hadamard(
 ,   float const& sigma
 ,   const float lambdaHard3D
 ,   float &weight
-,   const bool doWeight
 ){
     //! Declarations
     const unsigned kHard_2 = kHard * kHard;
@@ -619,8 +596,7 @@ void ht_filtering_hadamard(
         group_3D[k] *= coef;
 
     //! Weight for aggregation
-    if (doWeight)
-    	weight = (weight > 0.0f ? 1.0f / (float)(sigma * sigma * weight) : 1.0f);
+    weight = (weight > 0.0f ? 1.0f / (float)(sigma * sigma * weight) : 1.0f);
 }
 
 /**
@@ -646,7 +622,6 @@ void wiener_filtering_hadamard(
 ,   const unsigned kWien
 ,   float const& sigma
 ,   float &weight
-,   const bool doWeight
 ){
     //! Declarations
     const unsigned kWien_2 = kWien * kWien;
@@ -681,9 +656,8 @@ void wiener_filtering_hadamard(
         hadamard_transform(group_3D_est, tmp, nSx_r, n * nSx_r);
 
     //! Weight for aggregation
-	if (doWeight)
-		weight = (weight > 0.0f ? 1.0f / (float)
-				(sigma * sigma * weight) : 1.0f);
+    weight = (weight > 0.0f ? 1.0f / (float)
+            (sigma * sigma * weight) : 1.0f);
 }
 
 /**
@@ -955,43 +929,6 @@ void precompute_BM(
                 patch_table[k_r].push_back(table_distance[n].second);
         }
     }
-}
-
-/**
- * @brief Process of a weight dependent on the standard
- *        deviation, used during the weighted aggregation.
- *
- * @param group_3D : 3D group
- * @param nSx_r : number of similar patches in the 3D group
- * @param kHW: size of patches
- * @param weight_table: will contain the weighting for each
- *        channel.
- *
- * @return none.
- **/
-void sd_weighting(
-    std::vector<float> const& group_3D
-,   const unsigned nSx_r
-,   const unsigned kHW
-,   float &weight
-){
-    const unsigned N = nSx_r * kHW * kHW;
-
-	//! Initialization
-	float mean = 0.0f;
-	float std  = 0.0f;
-
-	//! Compute the sum and the square sum
-	for (unsigned k = 0; k < N; k++) {
-		mean += group_3D[k];
-		std  += group_3D[k] * group_3D[k];
-	}
-
-	//! Sample standard deviation (Bessel's correction)
-	float res = (std - mean * mean / (float) N) / (float) (N - 1);
-
-	//! Return the weight as used in the aggregation
-	weight = (res > 0.0f ? 1.0f / sqrtf(res) : 0.0f);
 }
 
 /**
