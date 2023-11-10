@@ -37,7 +37,4 @@ class MyEccTest{
         void project_onto_jacobian_ECC(const Mat& src1, const Mat& src2, Mat& dst);
 
         void update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, const int motionType);
-
-        double computeECC(InputArray templateImage, InputArray inputImage, InputArray inputMask);
-
 };

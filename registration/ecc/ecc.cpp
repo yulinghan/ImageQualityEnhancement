@@ -9,23 +9,8 @@ MyEccTest::~MyEccTest() {
 
 void MyEccTest::image_jacobian_homo_ECC(const Mat& src1, const Mat& src2,
                                     const Mat& src3, const Mat& src4,
-                                    const Mat& src5, Mat& dst)
-{
-
-
-    CV_Assert(src1.size() == src2.size());
-    CV_Assert(src1.size() == src3.size());
-    CV_Assert(src1.size() == src4.size());
-
-    CV_Assert( src1.rows == dst.rows);
-    CV_Assert(dst.cols == (src1.cols*8));
-    CV_Assert(dst.type() == CV_32FC1);
-
-    CV_Assert(src5.isContinuous());
-
-
+                                    const Mat& src5, Mat& dst) {
     const float* hptr = src5.ptr<float>(0);
-
     const float h0_ = hptr[0];
     const float h1_ = hptr[3];
     const float h2_ = hptr[6];
@@ -37,7 +22,6 @@ void MyEccTest::image_jacobian_homo_ECC(const Mat& src1, const Mat& src2,
 
     const int w = src1.cols;
 
-
     //create denominator for all points as a block
     Mat den_ = src3*h2_ + src4*h5_ + 1.0;//check the time of this! otherwise use addWeighted
 
@@ -46,7 +30,6 @@ void MyEccTest::image_jacobian_homo_ECC(const Mat& src1, const Mat& src2,
     divide(hatX_, den_, hatX_);
     Mat hatY_ = -src3*h1_ - src4*h4_ - h7_;
     divide(hatY_, den_, hatY_);
-
 
     //instead of dividing each block with den,
     //just pre-divide the block of gradients (it's more efficient)
@@ -59,9 +42,7 @@ void MyEccTest::image_jacobian_homo_ECC(const Mat& src1, const Mat& src2,
 
 
     //compute Jacobian blocks (8 blocks)
-
     dst.colRange(0, w) = src1Divided_.mul(src3);//1
-
     dst.colRange(w,2*w) = src2Divided_.mul(src3);//2
 
     Mat temp_ = (hatX_.mul(src1Divided_)+hatY_.mul(src2Divided_));
@@ -71,20 +52,15 @@ void MyEccTest::image_jacobian_homo_ECC(const Mat& src1, const Mat& src2,
     hatY_.release();
 
     dst.colRange(3*w, 4*w) = src1Divided_.mul(src4);//4
-
     dst.colRange(4*w, 5*w) = src2Divided_.mul(src4);//5
-
     dst.colRange(5*w, 6*w) = temp_.mul(src4);//6
-
     src1Divided_.copyTo(dst.colRange(6*w, 7*w));//7
-
     src2Divided_.copyTo(dst.colRange(7*w, 8*w));//8
 }
 
 void MyEccTest::image_jacobian_euclidean_ECC(const Mat& src1, const Mat& src2,
                                          const Mat& src3, const Mat& src4,
-                                         const Mat& src5, Mat& dst)
-{
+                                         const Mat& src5, Mat& dst) {
 
     CV_Assert( src1.size()==src2.size());
     CV_Assert( src1.size()==src3.size());
@@ -109,7 +85,6 @@ void MyEccTest::image_jacobian_euclidean_ECC(const Mat& src1, const Mat& src2,
     //create cos(theta)*X -sin(theta)*Y for all points as a block -> hatY
     Mat hatY = (src3*h0) - (src4*h1);
 
-
     //compute Jacobian blocks (3 blocks)
     dst.colRange(0, w) = (src1.mul(hatX))+(src2.mul(hatY));//1
 
@@ -120,23 +95,10 @@ void MyEccTest::image_jacobian_euclidean_ECC(const Mat& src1, const Mat& src2,
 
 void MyEccTest::image_jacobian_affine_ECC(const Mat& src1, const Mat& src2,
                                       const Mat& src3, const Mat& src4,
-                                      Mat& dst)
-{
-
-    CV_Assert(src1.size() == src2.size());
-    CV_Assert(src1.size() == src3.size());
-    CV_Assert(src1.size() == src4.size());
-
-    CV_Assert(src1.rows == dst.rows);
-    CV_Assert(dst.cols == (6*src1.cols));
-
-    CV_Assert(dst.type() == CV_32FC1);
-
-
+                                      Mat& dst) {
     const int w = src1.cols;
 
     //compute Jacobian blocks (6 blocks)
-
     dst.colRange(0,w) = src1.mul(src3);//1
     dst.colRange(w,2*w) = src2.mul(src3);//2
     dst.colRange(2*w,3*w) = src1.mul(src4);//3
@@ -145,16 +107,7 @@ void MyEccTest::image_jacobian_affine_ECC(const Mat& src1, const Mat& src2,
     src2.copyTo(dst.colRange(5*w,6*w));//6
 }
 
-
-void MyEccTest::image_jacobian_translation_ECC(const Mat& src1, const Mat& src2, Mat& dst)
-{
-
-    CV_Assert( src1.size()==src2.size());
-
-    CV_Assert( src1.rows == dst.rows);
-    CV_Assert(dst.cols == (src1.cols*2));
-    CV_Assert(dst.type() == CV_32FC1);
-
+void MyEccTest::image_jacobian_translation_ECC(const Mat& src1, const Mat& src2, Mat& dst) {
     const int w = src1.cols;
 
     //compute Jacobian blocks (2 blocks)
@@ -162,9 +115,7 @@ void MyEccTest::image_jacobian_translation_ECC(const Mat& src1, const Mat& src2,
     src2.copyTo(dst.colRange(w, 2*w));
 }
 
-
-void MyEccTest::project_onto_jacobian_ECC(const Mat& src1, const Mat& src2, Mat& dst)
-{
+void MyEccTest::project_onto_jacobian_ECC(const Mat& src1, const Mat& src2, Mat& dst){
     /* this functions is used for two types of projections. If src1.cols ==src.cols
     it does a blockwise multiplication (like in the outer product of vectors)
     of the blocks in matrices src1 and src2 and dst
@@ -175,8 +126,6 @@ void MyEccTest::project_onto_jacobian_ECC(const Mat& src1, const Mat& src2, Mat&
     (i.e. rtanslation:2, euclidean: 3, affine: 6, homography: 8)
 
     */
-    CV_Assert(src1.rows == src2.rows);
-    CV_Assert((src1.cols % src2.cols) == 0);
     int w;
 
     float* dstPtr = dst.ptr<float>(0);
@@ -186,14 +135,10 @@ void MyEccTest::project_onto_jacobian_ECC(const Mat& src1, const Mat& src2, Mat&
         for (int i=0; i<dst.rows; i++){
             dstPtr[i] = (float) src2.dot(src1.colRange(i*w,(i+1)*w));
         }
-    }
-
-    else {
-        CV_Assert(dst.cols == dst.rows); //dst is square (and symmetric)
+    } else {
         w = src2.cols/dst.cols;
         Mat mat;
         for (int i=0; i<dst.rows; i++){
-
             mat = Mat(src1.colRange(i*w, (i+1)*w));
             dstPtr[i*(dst.rows+1)] = (float) pow(norm(mat),2); //diagonal elements
 
@@ -206,14 +151,7 @@ void MyEccTest::project_onto_jacobian_ECC(const Mat& src1, const Mat& src2, Mat&
 }
 
 
-void MyEccTest::update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, const int motionType)
-{
-    CV_Assert (map_matrix.type() == CV_32FC1);
-    CV_Assert (update.type() == CV_32FC1);
-
-    CV_Assert (motionType == MOTION_TRANSLATION || motionType == MOTION_EUCLIDEAN ||
-        motionType == MOTION_AFFINE || motionType == MOTION_HOMOGRAPHY);
-
+void MyEccTest::update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, const int motionType) {
     if (motionType == MOTION_HOMOGRAPHY)
         CV_Assert (map_matrix.rows == 3 && update.rows == 8);
     else if (motionType == MOTION_AFFINE)
@@ -223,15 +161,8 @@ void MyEccTest::update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, c
     else
         CV_Assert (map_matrix.rows == 2 && update.rows == 2);
 
-    CV_Assert (update.cols == 1);
-
-    CV_Assert( map_matrix.isContinuous());
-    CV_Assert( update.isContinuous() );
-
-
     float* mapPtr = map_matrix.ptr<float>(0);
     const float* updatePtr = update.ptr<float>(0);
-
 
     if (motionType == MOTION_TRANSLATION){
         mapPtr[2] += updatePtr[0];
@@ -267,63 +198,8 @@ void MyEccTest::update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, c
     }
 }
 
-
-/** Function that computes enhanced corelation coefficient from Georgios et.al. 2008
-*   See https://github.com/opencv/opencv/issues/12432
-*/
-double MyEccTest::computeECC(InputArray templateImage, InputArray inputImage, InputArray inputMask)
-{
-    CV_Assert(!templateImage.empty());
-    CV_Assert(!inputImage.empty());
-
-    if( ! (templateImage.type()==inputImage.type()))
-        CV_Error( Error::StsUnmatchedFormats, "Both input images must have the same data type" );
-
-    Scalar meanTemplate, sdTemplate;
-
-    int active_pixels = inputMask.empty() ? templateImage.size().area() : countNonZero(inputMask);
-    int type = templateImage.type();
-    meanStdDev(templateImage, meanTemplate, sdTemplate, inputMask);
-    Mat templateImage_zeromean = Mat::zeros(templateImage.size(), templateImage.type());
-    Mat templateMat = templateImage.getMat();
-    Mat inputMat = inputImage.getMat();
-
-    /*
-     * For unsigned ints, when the mean is computed and subtracted, any values less than the mean
-     * will be set to 0 (since there are no negatives values). This impacts the norm and dot product, which
-     * ultimately results in an incorrect ECC. To circumvent this problem, if unsigned ints are provided,
-     * we convert them to a signed ints with larger resolution for the subtraction step.
-     */
-    if(type == CV_8U || type == CV_16U) {
-        int newType = type == CV_8U ? CV_16S : CV_32S;
-        Mat templateMatConverted, inputMatConverted;
-        templateMat.convertTo(templateMatConverted, newType);
-        cv::swap(templateMat, templateMatConverted);
-        inputMat.convertTo(inputMatConverted, newType);
-        cv::swap(inputMat, inputMatConverted);
-    }
-    subtract(templateMat, meanTemplate, templateImage_zeromean, inputMask);
-    double templateImagenorm = std::sqrt(active_pixels*sdTemplate.val[0]*sdTemplate.val[0]);
-
-    Scalar meanInput, sdInput;
-
-    Mat inputImage_zeromean = Mat::zeros(inputImage.size(), inputImage.type());
-    meanStdDev(inputImage, meanInput, sdInput, inputMask);
-    subtract(inputMat, meanInput, inputImage_zeromean, inputMask);
-    double inputImagenorm = std::sqrt(active_pixels*sdInput.val[0]*sdInput.val[0]);
-
-    return templateImage_zeromean.dot(inputImage_zeromean)/(templateImagenorm*inputImagenorm);
-}
-
-
-double MyEccTest::findTransformECC(Mat src,
-                            Mat dst,
-                            Mat &map,
-                            int motionType,
-                            int number_of_iterations, 
-                            float termination_eps,
-                            int gaussFiltSize)
-{
+double MyEccTest::findTransformECC(Mat src, Mat dst, Mat &map, int motionType,
+                int number_of_iterations, float termination_eps, int gaussFiltSize) {
     // If the user passed an un-initialized warpMatrix, initialize to identity
     if(map.empty()) {
         int rowCount = 2;
@@ -332,26 +208,6 @@ double MyEccTest::findTransformECC(Mat src,
 
         map.create(rowCount, 3, CV_32FC1);
         map = Mat::eye(rowCount, 3, CV_32F);
-    }
-
-    if( ! (src.type()==dst.type()))
-        CV_Error( Error::StsUnmatchedFormats, "Both input images must have the same data type" );
-
-    //accept only 1-channel images
-    if( src.type() != CV_8UC1 && src.type()!= CV_32FC1)
-        CV_Error( Error::StsUnsupportedFormat, "Images must have 8uC1 or 32fC1 type");
-
-    if( map.type() != CV_32FC1)
-        CV_Error( Error::StsUnsupportedFormat, "warpMatrix must be single-channel floating-point matrix");
-
-    CV_Assert (map.cols == 3);
-    CV_Assert (map.rows == 2 || map.rows ==3);
-
-    CV_Assert (motionType == MOTION_AFFINE || motionType == MOTION_HOMOGRAPHY ||
-        motionType == MOTION_EUCLIDEAN || motionType == MOTION_TRANSLATION);
-
-    if (motionType == MOTION_HOMOGRAPHY){
-        CV_Assert (map.rows ==3);
     }
 
     int paramTemp = 6;//default: affine
@@ -366,7 +222,6 @@ double MyEccTest::findTransformECC(Mat src,
           paramTemp = 8;
           break;
     }
-
 
     const int numberOfParameters = paramTemp;
 
@@ -400,26 +255,11 @@ double MyEccTest::findTransformECC(Mat src,
     Mat imageWarped   = Mat(hs, ws, CV_32F);// to store the warped zero-mean input image
     Mat imageMask     = Mat(hs, ws, CV_8U); // to store the final mask
 
-    Mat inputMask;
-    //to use it for mask warping
-    Mat preMask;
-    if(inputMask.empty())
-        preMask = Mat::ones(hd, wd, CV_8U);
-    else
-        threshold(inputMask, preMask, 0, 1, THRESH_BINARY);
+    Mat preMask = Mat::ones(hd, wd, CV_8U);
 
     //gaussian filtering is optional
     src.convertTo(templateFloat, templateFloat.type());
     GaussianBlur(templateFloat, templateFloat, Size(gaussFiltSize, gaussFiltSize), 0, 0);
-
-    Mat preMaskFloat;
-    preMask.convertTo(preMaskFloat, CV_32F);
-    GaussianBlur(preMaskFloat, preMaskFloat, Size(gaussFiltSize, gaussFiltSize), 0, 0);
-    // Change threshold.
-    preMaskFloat *= (0.5/0.95);
-    // Rounding conversion.
-    preMaskFloat.convertTo(preMask, preMask.type());
-    preMask.convertTo(preMaskFloat, preMaskFloat.type());
 
     dst.convertTo(imageFloat, imageFloat.type());
     GaussianBlur(imageFloat, imageFloat, Size(gaussFiltSize, gaussFiltSize), 0, 0);
@@ -430,15 +270,11 @@ double MyEccTest::findTransformECC(Mat src,
     Mat gradientXWarped = Mat(hs, ws, CV_32FC1);
     Mat gradientYWarped = Mat(hs, ws, CV_32FC1);
 
-
     // calculate first order image derivatives
     Matx13f dx(-0.5f, 0.0f, 0.5f);
 
     filter2D(imageFloat, gradientX, -1, dx);
     filter2D(imageFloat, gradientY, -1, dx.t());
-
-    gradientX = gradientX.mul(preMaskFloat);
-    gradientY = gradientY.mul(preMaskFloat);
 
     // matrices needed for solving linear equation system for maximizing ECC
     Mat jacobian                = Mat(hs, ws*numberOfParameters, CV_32F);
@@ -455,39 +291,32 @@ double MyEccTest::findTransformECC(Mat src,
     const int imageFlags = INTER_LINEAR  + WARP_INVERSE_MAP;
     const int maskFlags  = INTER_NEAREST + WARP_INVERSE_MAP;
 
-
     // iteratively update map_matrix
     double rho      = -1;
     double last_rho = - termination_eps;
-    for (int i = 1; (i <= number_of_iterations) && (fabs(rho-last_rho)>= termination_eps); i++)
-    {
+    for (int i = 1; (i <= number_of_iterations) && (fabs(rho-last_rho)>= termination_eps); i++) {
 
         // warp-back portion of the inputImage and gradients to the coordinate space of the templateImage
-        if (motionType != MOTION_HOMOGRAPHY)
-        {
+        if (motionType != MOTION_HOMOGRAPHY) {
             warpAffine(imageFloat, imageWarped,     map, imageWarped.size(),     imageFlags);
             warpAffine(gradientX,  gradientXWarped, map, gradientXWarped.size(), imageFlags);
             warpAffine(gradientY,  gradientYWarped, map, gradientYWarped.size(), imageFlags);
-            warpAffine(preMask,    imageMask,       map, imageMask.size(),       maskFlags);
-        }
-        else
-        {
+        } else {
             warpPerspective(imageFloat, imageWarped,     map, imageWarped.size(),     imageFlags);
             warpPerspective(gradientX,  gradientXWarped, map, gradientXWarped.size(), imageFlags);
             warpPerspective(gradientY,  gradientYWarped, map, gradientYWarped.size(), imageFlags);
-            warpPerspective(preMask,    imageMask,       map, imageMask.size(),       maskFlags);
         }
 
         Scalar imgMean, imgStd, tmpMean, tmpStd;
-        meanStdDev(imageWarped,   imgMean, imgStd, imageMask);
-        meanStdDev(templateFloat, tmpMean, tmpStd, imageMask);
+        meanStdDev(imageWarped,   imgMean, imgStd);
+        meanStdDev(templateFloat, tmpMean, tmpStd);
 
-        subtract(imageWarped,   imgMean, imageWarped, imageMask);//zero-mean input
+        subtract(imageWarped,   imgMean, imageWarped);//zero-mean input
         templateZM = Mat::zeros(templateZM.rows, templateZM.cols, templateZM.type());
-        subtract(templateFloat, tmpMean, templateZM,  imageMask);//zero-mean template
+        subtract(templateFloat, tmpMean, templateZM);//zero-mean template
 
-        const double tmpNorm = std::sqrt(countNonZero(imageMask)*(tmpStd.val[0])*(tmpStd.val[0]));
-        const double imgNorm = std::sqrt(countNonZero(imageMask)*(imgStd.val[0])*(imgStd.val[0]));
+        const double tmpNorm = std::sqrt(hd*wd*(tmpStd.val[0])*(tmpStd.val[0]));
+        const double imgNorm = std::sqrt(hd*wd*(imgStd.val[0])*(imgStd.val[0]));
 
         // calculate jacobian of image wrt parameters
         switch (motionType){
@@ -516,7 +345,6 @@ double MyEccTest::findTransformECC(Mat src,
         last_rho = rho;
         rho = correlation/(imgNorm*tmpNorm);
 
-
         cout << "!!!!!! rho:" << rho << ", i:" << i << endl;
         if (cvIsNaN(rho)) {
           CV_Error(Error::StsNoConv, "NaN encountered.");
@@ -526,13 +354,11 @@ double MyEccTest::findTransformECC(Mat src,
         project_onto_jacobian_ECC( jacobian, imageWarped, imageProjection);
         project_onto_jacobian_ECC(jacobian, templateZM, templateProjection);
 
-
         // calculate the parameter lambda to account for illumination variation
         imageProjectionHessian = hessianInv*imageProjection;
         const double lambda_n = (imgNorm*imgNorm) - imageProjection.dot(imageProjectionHessian);
         const double lambda_d = correlation - templateProjection.dot(imageProjectionHessian);
-        if (lambda_d <= 0.0)
-        {
+        if (lambda_d <= 0.0) {
             rho = -1;
             CV_Error(Error::StsNoConv, "The algorithm stopped before its convergence. The correlation is going to be minimized. Images may be uncorrelated or non-overlapped");
 
@@ -546,8 +372,6 @@ double MyEccTest::findTransformECC(Mat src,
 
         // update warping matrix
         update_warping_matrix_ECC( map, deltaP, motionType);
-
-
     }
 
     // return final correlation coefficient

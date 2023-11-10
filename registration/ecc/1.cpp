@@ -27,10 +27,11 @@ int main(int argc, char* argv[]){
     int number_of_iterations = 100;
     double termination_eps = 1e-8;
     int gaussFiltSize = 3;
+    int motionType = MOTION_HOMOGRAPHY;
 
     Mat warp_matrix;
     MyEccTest *my_ecc_test = new MyEccTest();
-    double rho = my_ecc_test->findTransformECC(ref, input, warp_matrix, MOTION_AFFINE, number_of_iterations, termination_eps, gaussFiltSize);
+    double rho = my_ecc_test->findTransformECC(ref, input, warp_matrix, motionType, number_of_iterations, termination_eps, gaussFiltSize);
 
     cout << "rho:" << rho << endl;
     cout << "warp_matrix:" << endl;
@@ -38,7 +39,11 @@ int main(int argc, char* argv[]){
 
     int imageFlags = INTER_LINEAR  + WARP_INVERSE_MAP;
     Mat warped;
-    warpAffine(input, warped, warp_matrix, input.size(), imageFlags);
+    if(motionType != MOTION_HOMOGRAPHY) {
+        warpAffine(input, warped, warp_matrix, input.size(), imageFlags);
+    } else {
+        warpPerspective(input, warped, warp_matrix, input.size(), imageFlags);
+    }
     imwrite("warped.jpg", warped);
 
 	return 0;
