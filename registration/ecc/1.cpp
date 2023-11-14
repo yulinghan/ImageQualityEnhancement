@@ -9,7 +9,8 @@
 #include <errno.h>
 #include <dirent.h>  
 #include <unistd.h>
-#include "ecc.hpp"
+#include "fa_ecc.hpp"
+#include "ic_ecc.hpp"
 
 using namespace cv;
 using namespace std;
@@ -27,24 +28,34 @@ int main(int argc, char* argv[]){
     int number_of_iterations = 100;
     double termination_eps = 1e-8;
     int gaussFiltSize = 3;
-    int motionType = MOTION_HOMOGRAPHY;
+    int motionType = MOTION_TRANSLATION;
+    int imageFlags = INTER_LINEAR  + WARP_INVERSE_MAP;
 
+    //前向累加fa_ecc
     Mat warp_matrix;
-    MyEccTest *my_ecc_test = new MyEccTest();
-    double rho = my_ecc_test->findTransformECC(ref, input, warp_matrix, motionType, number_of_iterations, termination_eps, gaussFiltSize);
+    MyFaEccTest *my_fa_ecc_test = new MyFaEccTest();
+    double rho = my_fa_ecc_test->findTransformECC(ref, input, warp_matrix, motionType, number_of_iterations, termination_eps, gaussFiltSize);
 
-    cout << "rho:" << rho << endl;
-    cout << "warp_matrix:" << endl;
+    cout << "fa_rho:" << rho << endl;
+    cout << "fa_warp_matrix:" << endl;
     cout << warp_matrix << endl;
 
-    int imageFlags = INTER_LINEAR  + WARP_INVERSE_MAP;
     Mat warped;
-    if(motionType != MOTION_HOMOGRAPHY) {
-        warpAffine(input, warped, warp_matrix, input.size(), imageFlags);
-    } else {
-        warpPerspective(input, warped, warp_matrix, input.size(), imageFlags);
-    }
-    imwrite("warped.jpg", warped);
+    warpAffine(input, warped, warp_matrix, input.size(), imageFlags);
+    imwrite("fa_warped.jpg", warped);
+
+    //反向累加ic_ecc
+    MyIcEccTest *my_ic_ecc_test = new MyIcEccTest();
+    rho = my_ic_ecc_test->findTransformECC(ref, input, warp_matrix, motionType, number_of_iterations, termination_eps, gaussFiltSize);
+
+    cout << "ic_rho:" << rho << endl;
+    cout << "ic_warp_matrix:" << endl;
+    cout << warp_matrix << endl;
+
+    warpAffine(input, warped, warp_matrix, input.size(), imageFlags);
+    imwrite("ic_warped.jpg", warped);
+
+
 
 	return 0;
 }
