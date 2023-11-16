@@ -17,10 +17,11 @@ using namespace std;
 int main(int argc, char* argv[]){
     Mat src = imread(argv[1], 0);
     resize(src, src, src.size()/4);
-    imwrite("src.jpg", src);
+    imshow("src", src);
 
     MySiftTest *my_sift_test = new MySiftTest();
     my_sift_test->run(src);
 
+    waitKey(0);
 	return 0;
 }
