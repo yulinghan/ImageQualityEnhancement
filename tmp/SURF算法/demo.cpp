@@ -118,8 +118,8 @@ int mainMatch(void)
   //object.jpg是我们希望在视频帧中寻找的参考目标
   IplImage *img = cvLoadImage("imgs/object.jpg"); //载入参考图像
   if (img == NULL) error("Need to load reference image in order to run matching procedure");
-  CvPoint src_corners[4] = {{0,0}, {img->width,0}, {img->width, img->height}, {0, img->height}};
-  CvPoint dst_corners[4];
+  cv::Point src_corners[4] = {{0,0}, {img->width,0}, {img->width, img->height}, {0, img->height}};
+  cv::Point dst_corners[4];
 
   //提取参考对象的特征点向量
   surfDetDes(img, ref_ipts, false, 3, 4, 3, 0.004f);

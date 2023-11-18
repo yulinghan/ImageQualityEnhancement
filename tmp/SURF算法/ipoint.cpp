@@ -61,7 +61,7 @@ void getMatches(IpVec &ipts1, IpVec &ipts2, IpPairVec &matches)
 //-------------------------------------------------------
 
 //求解匹配点之间的单应性矩阵，并将src_corners变换到dst_corners
-int translateCorners(IpPairVec &matches, const CvPoint src_corners[4], CvPoint dst_corners[4])
+int translateCorners(IpPairVec &matches, const cv::Point src_corners[4], cv::Point dst_corners[4])
 {
 #ifndef LINUX
   double h[9];//保存单应性矩阵的数组h
