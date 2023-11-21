@@ -445,7 +445,7 @@ void MySiftTest::ExtractFeatureDescriptors(vector<vector<Mat>> gauss_pyr, vector
 }
 
 void MySiftTest::run(Mat src) {
-    src.convertTo(src, CV_32FC1, 1/255.0);
+    src.convertTo(src, CV_32FC1);
 
     //预滤波除噪声
     int filter_size = 5;
@@ -477,7 +477,7 @@ void MySiftTest::run(Mat src) {
 #if 1
     //显示极值点位置
     Mat Keypoint_show = DisplayKeypointLocation(src, KeypointSt_vec_1);
-    imshow("Keypoint", Keypoint_show);
+    imshow("Keypoint", Keypoint_show/255);
 #endif
 
     //计算各个特征点的主方向
@@ -490,7 +490,7 @@ void MySiftTest::run(Mat src) {
 #if 1
     //显示特征点方向和幅值
     Mat mag_grd_show = DisplayOrientation(src, KeypointSt_vec_2, kern_size_arr);
-    imshow("mag_grd_show", mag_grd_show);
+    imshow("mag_grd_show", mag_grd_show/255);
 #endif
 
     //128位特征描述符存在了KeypointSt_vec_2[k]..descrip中
