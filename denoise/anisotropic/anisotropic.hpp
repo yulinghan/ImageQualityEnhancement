@@ -24,4 +24,5 @@ class MyAnisotropicTest{
         float pm_g1(float value, float k);
         float pm_g2(float value, float k);
         float pm_g3(float value, float k);
+		float Compute_K_Percentile(Mat img, int nbins);
 };
