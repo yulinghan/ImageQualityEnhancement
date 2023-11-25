@@ -1,24 +1,24 @@
-#include "anisotropic.hpp"
+#include "ori_anisotropic.hpp"
 
-MyAnisotropicTest::MyAnisotropicTest() {
+MyOriAnisotropicTest::MyOriAnisotropicTest() {
 }
 
-MyAnisotropicTest::~MyAnisotropicTest() {
+MyOriAnisotropicTest::~MyOriAnisotropicTest() {
 }
 
-float MyAnisotropicTest::pm_g1(float value, float k) {
+float MyOriAnisotropicTest::pm_g1(float value, float k) {
     float weight = exp(-value*value/(k*k));
 
     return weight;
 }
 
-float MyAnisotropicTest::pm_g2(float value, float k) {
+float MyOriAnisotropicTest::pm_g2(float value, float k) {
     float weight = 1.0 / (1.0 + (value*value)/(k*k));
 
     return weight;
 }
 
-float MyAnisotropicTest::pm_g3(float value, float k) {
+float MyOriAnisotropicTest::pm_g3(float value, float k) {
     float weight;
     if(value*value == 0) {
         weight = 1;
@@ -30,7 +30,7 @@ float MyAnisotropicTest::pm_g3(float value, float k) {
     return weight;
 }
 
-float MyAnisotropicTest::Compute_K_Percentile(Mat img, int nbins) {
+float MyOriAnisotropicTest::Compute_K_Percentile(Mat img, int nbins) {
     float hist[nbins];
 	for(unsigned int i = 0; i < nbins; i++ ) {
 		hist[i] = 0.0;
@@ -99,23 +99,18 @@ float MyAnisotropicTest::Compute_K_Percentile(Mat img, int nbins) {
 	return kperc;
 }
 
-Mat MyAnisotropicTest::Run(Mat src) {
-	src.convertTo(src, CV_32FC1, 1./255.0);
-
-    Mat anisotropic_mat;
-    Mat temp_mat = src.clone();
+Mat MyOriAnisotropicTest::IterAnisotropicTest(Mat src, float k) {
+	Mat temp_mat = src.clone();
 
     int iterations=30;
     float lambda=0.15;
-	float k = Compute_K_Percentile(src, 128);
-	cout << "k:" << k << endl;
 
     for(int t = 0;t < iterations; ++t) {
-        anisotropic_mat = temp_mat.clone();
+        src = temp_mat.clone();
         for(int i=1; i<src.rows-1; i++) {
-            float *data_ori_ptr  = anisotropic_mat.ptr<float>(i);
-            float *data_prev_ptr = anisotropic_mat.ptr<float>(i-1);
-            float *data_next_ptr = anisotropic_mat.ptr<float>(i+1);
+            float *data_ori_ptr  = src.ptr<float>(i);
+            float *data_prev_ptr = src.ptr<float>(i-1);
+            float *data_next_ptr = src.ptr<float>(i+1);
             float *temp_mat_ptr  = temp_mat.ptr<float>(i);
 
             for(int j=1; j<src.cols-1; j++) {
@@ -138,6 +133,17 @@ Mat MyAnisotropicTest::Run(Mat src) {
             }
         }
     }
+
+	return temp_mat;
+}
+
+Mat MyOriAnisotropicTest::Run(Mat src) {
+	src.convertTo(src, CV_32FC1, 1./255.0);
+
+	float k = Compute_K_Percentile(src, 128);
+	cout << "k:" << k << endl;
+
+	Mat temp_mat = IterAnisotropicTest(src, k);
 
 	temp_mat = temp_mat * 255.0;
 	temp_mat.convertTo(temp_mat, CV_8UC1);	

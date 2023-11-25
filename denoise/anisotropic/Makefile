@@ -1,8 +1,8 @@
 CCPP=g++
 CC=gcc
 
-CFLAGS=`pkg-config --cflags opencv4` 
-LDFLAGS=`pkg-config --libs opencv4` -lpthread
+CFLAGS=`pkg-config --cflags opencv` 
+LDFLAGS=`pkg-config --libs opencv` -lpthread
 
 SOURCES_CPP := $(shell find . -name '*.cpp')
 SOURCES_C := $(shell find . -name '*.c')
