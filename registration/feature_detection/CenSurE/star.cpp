@@ -8,59 +8,54 @@ MyStarTest::~MyStarTest() {
 
 void MyStarTest::computeIntegralImages(Mat& matI, Mat& matS, Mat& matT, Mat& _FT) {
     int x, y, rows = matI.rows, cols = matI.cols;
+    matS = Mat::zeros(Size(cols + 1, rows + 1), CV_32S);
+    matT = Mat::zeros(Size(cols + 1, rows + 1), CV_32S);
+    _FT  = Mat::zeros(Size(cols + 1, rows + 1), CV_32S);
 
-    matS.create(rows + 1, cols + 1, CV_32S);
-    matT.create(rows + 1, cols + 1, CV_32S);
-    _FT.create(rows + 1, cols + 1, CV_32S);
-
-    uchar* I = matI.ptr<uchar>();
-
-    int *S = matS.ptr<int>();
-    int *T = matT.ptr<int>();
-    int *FT = _FT.ptr<int>();
-
-    int istep = (int)(matI.step/matI.elemSize());
-    int step = (int)(matS.step/matS.elemSize());
-
-    for( x = 0; x <= cols; x++ )
-        S[x] = T[x] = FT[x] = 0;
-
-    S += step; T += step; FT += step;
-    S[0] = T[0] = 0;
-    FT[0] = I[0];
-    for(x = 1; x < cols; x++) {
-        S[x] = S[x-1] + I[x-1];
-        T[x] = I[x-1];
-        FT[x] = I[x] + I[x-1];
+    for( x = 0; x <= cols; x++) {
+        matS.at<int>(0, x) = 0;
+        matT.at<int>(0, x) = 0;
+        _FT.at<int>(0, x)  = 0;
     }
-    S[cols] = S[cols-1] + I[cols-1];
-    T[cols] = FT[cols] = I[cols-1];
+
+    matS.at<int>(1, 0) = 0;
+    matT.at<int>(1, 0) = 0;
+    _FT.at<int>(1, 0)  = matI.at<uchar>(0, 0);
+
+    for(x = 1; x < cols; x++) {
+        matS.at<int>(1, x) = matS.at<int>(1, x-1) + matI.at<uchar>(0, x-1);
+        matT.at<int>(1, x) = matI.at<uchar>(0, x-1);
+        _FT.at<int>(1, x)  = matI.at<uchar>(0, x) + matI.at<uchar>(0, x-1);
+    }
+    matS.at<int>(1, cols) = matS.at<int>(1, cols-1) + matI.at<uchar>(0, cols-1);
+    matT.at<int>(1, cols) = _FT.at<int>(1, cols) = matI.at<uchar>(0, cols-1);
 
     for(y = 2; y <= rows; y++) {
-        I += istep, S += step, T += step, FT += step;
-
-        S[0] = S[-step]; S[1] = S[-step+1] + I[0];
-        T[0] = T[-step + 1];
-        T[1] = FT[0] = T[-step + 2] + I[-istep] + I[0];
-        FT[1] = FT[-step + 2] + I[-istep] + I[1] + I[0];
+        matS.at<int>(y, 0) = matS.at<int>(y-1, 0);
+        matS.at<int>(y, 1) = matS.at<int>(y-1, 0);
+        matT.at<int>(y, 0) = matT.at<int>(y-1, 1);
+        matT.at<int>(y, 1) = matT.at<int>(y-1, 2) + matI.at<uchar>(y-1, 0) + matI.at<uchar>(y, 0);
+        _FT.at<int>(y, 0) = matT.at<int>(y, 1);
+        _FT.at<int>(y, 1) = _FT.at<int>(y-1, 2) + matI.at<uchar>(y-1, 0) + matI.at<uchar>(y, 1) + matI.at<uchar>(y, 0);
 
         for(x = 2; x < cols; x++) {
-            S[x] = S[x - 1] + S[-step + x] - S[-step + x - 1] + I[x - 1];
-            T[x] = T[-step + x - 1] + T[-step + x + 1] - T[-step*2 + x] + I[-istep + x - 1] + I[x - 1];
-            FT[x] = FT[-step + x - 1] + FT[-step + x + 1] - FT[-step*2 + x] + I[x] + I[x-1];
+            matS.at<int>(y, x) = matS.at<int>(y, x-1) + matS.at<int>(y-1, x) - matS.at<int>(y-1, x-1) + matI.at<uchar>(y-1, x-1);
+            matT.at<int>(y, x) = matT.at<int>(y-1, x-1) + matT.at<int>(y-1, x+1) - matT.at<int>(y-2, x) + matI.at<uchar>(y-2, x-1) + matI.at<uchar>(y-1, x-1);
+            _FT.at<int>(y, x)  = _FT.at<int>(y-1, x-1) + _FT.at<int>(y-1, x+1) - _FT.at<int>(y-2, x) + matI.at<uchar>(y-1, x) + matI.at<uchar>(y-1, x-1);
         }
-
-        S[cols] = S[cols - 1] + S[-step + cols] - S[-step + cols - 1] + I[cols - 1];
-        T[cols] = FT[cols] = T[-step + cols - 1] + I[-istep + cols - 1] + I[cols - 1];
+        matS.at<int>(y, cols) = matS.at<int>(y, cols-1) + matS.at<int>(y-1, cols) - matS.at<int>(y-1, cols-1) + matI.at<uchar>(y-1, cols-1);
+        matT.at<int>(y, cols) = matT.at<int>(y-1, cols-1) + matI.at<uchar>(y-2, cols-1) + matI.at<uchar>(y-1, cols-1);
+        _FT.at<int>(y, cols)  = matT.at<int>(y, cols);
     }
 }
 
 int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes, int maxSize) {
-    int MAX_PATTERN = 17;
-    int sizes0[] = {1, 2, 3, 4, 6, 8, 11, 12, 16, 22, 23, 32, 45, 46, 64, 90, 128, -1};
-    int pairs[12][2] = {{1, 0}, {3, 1}, {4, 2}, {5, 3}, {7, 4}, {8, 5}, {9, 6},
+    int MAX_PATTERN = 17, MAX_PAIR = 12;
+
+    //直方图均值滤波半径设置，用来模拟多尺度
+    int sizes0[MAX_PATTERN + 1] = {1, 2, 3, 4, 6, 8, 11, 12, 16, 22, 23, 32, 45, 46, 64, 90, 128, -1};
+    int pairs[MAX_PAIR][2] = {{1, 0}, {3, 1}, {4, 2}, {5, 3}, {7, 4}, {8, 5}, {9, 6},
                         {11, 8}, {13, 10}, {14, 11}, {15, 12}, {16, 14}};
-    int MAX_PAIR = sizeof(pairs)/sizeof(pairs[0]);
     float invSizes[MAX_PATTERN][2];
     int sizes1[MAX_PATTERN];
 
@@ -75,6 +70,7 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
     responses = Mat::zeros(img.size(), CV_32F);
     sizes = Mat::zeros(img.size(), CV_16S);
 
+    //根据输入参数，输入图像尺寸等限制，计算实际最大滤波半径
     int npatterns=0;
     while(npatterns < MAX_PAIR && !
           (sizes0[pairs[npatterns][0]] >= maxSize
@@ -85,13 +81,16 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
     if (npatterns-1 < MAX_PAIR) {
         ++npatterns;
     }
-    int maxIdx = pairs[npatterns-1][0];
 
+
+    //输入图像直方图/倾斜直方图计算
     Mat sum, tilted, flatTilted;
     computeIntegralImages(img, sum, tilted, flatTilted);
 
+    //预先计算每个像素不同缩放倍数下的等效均值滤波半径
+    //注意均值滤波有两个:原始矩形和45度旋转后矩形
     int step = (int)(sum.step/sum.elemSize());
-
+    int maxIdx = pairs[npatterns-1][0];
     for(int i = 0; i <= maxIdx; i++ ) {
         int ur_size = sizes0[i], t_size = sizes0[i] + sizes0[i]/2;
         int ur_area = (2*ur_size + 1)*(2*ur_size + 1);
@@ -118,8 +117,7 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
     sizes1[maxIdx] = -sizes1[maxIdx];
     int border = sizes0[maxIdx] + sizes0[maxIdx]/2;
 
-    for(int i = 0; i < npatterns; i++ )
-    {
+    for(int i = 0; i < npatterns; i++) {
         int innerArea = f[pairs[i][1]].area;
         int outerArea = f[pairs[i][0]].area;
         outerArea -= innerArea;
@@ -128,8 +126,7 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
         invSizes[i][1] = 1.f/innerArea;
     }
 
-    for( y = 0; y < border; y++ )
-    {
+    for(y = 0; y < border; y++) {
         float* r_ptr = responses.ptr<float>(y);
         float* r_ptr2 = responses.ptr<float>(rows - 1 - y);
         short* s_ptr = sizes.ptr<short>(y);
@@ -141,8 +138,7 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
         memset( s_ptr2, 0, cols*sizeof(s_ptr2[0]));
     }
 
-    for( y = border; y < rows - border; y++ )
-    {
+    for(y = border; y < rows - border; y++) {
         int x = border;
         float* r_ptr = responses.ptr<float>(y);
         short* s_ptr = sizes.ptr<short>(y);
@@ -152,26 +148,23 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
         memset( r_ptr + cols - border, 0, border*sizeof(r_ptr[0]));
         memset( s_ptr + cols - border, 0, border*sizeof(s_ptr[0]));
 
-        for( ; x < cols - border; x++ )
-        {
+        for(; x < cols - border; x++) {
             int ofs = y*step + x;
             int vals[MAX_PATTERN];
             float bestResponse = 0;
             int bestSize = 0;
 
-            for(int i = 0; i <= maxIdx; i++ )
-            {
+            for(int i = 0; i <= maxIdx; i++) {
                 const int** p = (const int**)f[i].p;
-                vals[i] = (int)(p[0][ofs] - p[1][ofs] - p[2][ofs] + p[3][ofs] +
-                    p[4][ofs] - p[5][ofs] - p[6][ofs] + p[7][ofs]);
+                vals[i] = (int)(p[0][ofs] - p[1][ofs] - p[2][ofs] + p[3][ofs]
+                            + p[4][ofs] - p[5][ofs] - p[6][ofs] + p[7][ofs]);
             }
-            for(int i = 0; i < npatterns; i++ )
-            {
+            for(int i = 0; i < npatterns; i++) {
+                //构建八角形计算不同尺度下响应分数，并保存最大分数和该分数所在尺度。
                 int inner_sum = vals[pairs[i][1]];
                 int outer_sum = vals[pairs[i][0]] - inner_sum;
                 float response = inner_sum*invSizes[i][1] - outer_sum*invSizes[i][0];
-                if( fabs(response) > fabs(bestResponse) )
-                {
+                if( fabs(response) > fabs(bestResponse)) {
                     bestResponse = response;
                     bestSize = sizes1[pairs[i][0]];
                 }
@@ -185,46 +178,34 @@ int MyStarTest::StarDetectorComputeResponses(Mat img, Mat &responses, Mat &sizes
     return border;
 }
 
-bool MyStarTest::StarDetectorSuppressLines(const Mat& responses, const Mat& sizes, Point pt,
-                                       int lineThresholdProjected, int lineThresholdBinarized) {
+bool MyStarTest::StarDetectorSuppressLines(const Mat& responses, const Mat& sizes, Point pt, int lineThresholdProjected) {
     const float* r_ptr = responses.ptr<float>();
     int rstep = (int)(responses.step/sizeof(r_ptr[0]));
     const short* s_ptr = sizes.ptr<short>();
     int sstep = (int)(sizes.step/sizeof(s_ptr[0]));
     int sz = s_ptr[pt.y*sstep + pt.x];
-    int x, y, delta = sz/4, radius = delta*4;
+    int x, y, delta = sz/4+3, radius = delta*4;
     float Lxx = 0, Lyy = 0, Lxy = 0;
     int Lxxb = 0, Lyyb = 0, Lxyb = 0;
 
-    for( y = pt.y - radius; y <= pt.y + radius; y += delta )
-        for( x = pt.x - radius; x <= pt.x + radius; x += delta )
-        {
+    for(y = pt.y - radius; y <= pt.y + radius; y += delta) {
+        for(x = pt.x - radius; x <= pt.x + radius; x += delta) {
             float Lx = r_ptr[y*rstep + x + 1] - r_ptr[y*rstep + x - 1];
             float Ly = r_ptr[(y+1)*rstep + x] - r_ptr[(y-1)*rstep + x];
             Lxx += Lx*Lx; Lyy += Ly*Ly; Lxy += Lx*Ly;
         }
+    }
 
-    if( (Lxx + Lyy)*(Lxx + Lyy) >= lineThresholdProjected*(Lxx*Lyy - Lxy*Lxy) )
+    if((Lxx*Lyy - Lxy*Lxy) >= lineThresholdProjected*(Lxx + Lyy)*(Lxx + Lyy)) {
         return true;
-
-    for( y = pt.y - radius; y <= pt.y + radius; y += delta )
-        for( x = pt.x - radius; x <= pt.x + radius; x += delta )
-        {
-            int Lxb = (s_ptr[y*sstep + x + 1] == sz) - (s_ptr[y*sstep + x - 1] == sz);
-            int Lyb = (s_ptr[(y+1)*sstep + x] == sz) - (s_ptr[(y-1)*sstep + x] == sz);
-            Lxxb += Lxb * Lxb; Lyyb += Lyb * Lyb; Lxyb += Lxb * Lyb;
-        }
-
-    if( (Lxxb + Lyyb)*(Lxxb + Lyyb) >= lineThresholdBinarized*(Lxxb*Lyyb - Lxyb*Lxyb) )
-        return true;
+    }
 
     return false;
 }
 
 void MyStarTest::StarDetectorSuppressNonmax(Mat& responses, Mat& sizes,
         vector<KeyPoint>& keypoints, int border,
-        int responseThreshold, int lineThresholdProjected,
-        int lineThresholdBinarized, int suppressNonmaxSize) {
+        int responseThreshold, int lineThresholdProjected, int suppressNonmaxSize) {
 
     int x, y, x1, y1, delta = suppressNonmaxSize/2;
     int rows = responses.rows, cols = responses.cols;
@@ -242,55 +223,48 @@ void MyStarTest::StarDetectorSuppressNonmax(Mat& responses, Mat& sizes,
             int tileEndY = MIN(y + delta, rows - border - 1);
             int tileEndX = MIN(x + delta, cols - border - 1);
 
-            for( y1 = y; y1 <= tileEndY; y1++ )
-                for( x1 = x; x1 <= tileEndX; x1++ )
-                {
+            //在预设窗口范围内，找大于响应阈值的最大/最小特征。
+            for( y1 = y; y1 <= tileEndY; y1++) {
+                for( x1 = x; x1 <= tileEndX; x1++) {
                     float val = r_ptr[y1*rstep + x1];
-                    if( maxResponse < val )
-                    {
+                    if(maxResponse < val) {
                         maxResponse = val;
                         maxPt = Point(x1, y1);
-                    }
-                    else if( minResponse > val )
-                    {
+                    } else if(minResponse > val) {
                         minResponse = val;
                         minPt = Point(x1, y1);
                     }
                 }
-
-            if( maxPt.x >= 0 )
-            {
-                for( y1 = maxPt.y - delta; y1 <= maxPt.y + delta; y1++ )
-                    for( x1 = maxPt.x - delta; x1 <= maxPt.x + delta; x1++ )
-                    {
+            }
+            if(maxPt.x >= 0) {
+                //相邻两个预设窗口特征点可能靠在一起，这种情况下只保留一个最大响应特征。
+                for(y1 = maxPt.y - delta; y1 <= maxPt.y + delta; y1++) {
+                    for(x1 = maxPt.x - delta; x1 <= maxPt.x + delta; x1++) {
                         float val = r_ptr[y1*rstep + x1];
                         if( val >= maxResponse && (y1 != maxPt.y || x1 != maxPt.x))
                             goto skip_max;
                     }
+                }
 
-                if( (featureSize = s_ptr[maxPt.y*sstep + maxPt.x]) >= 4 &&
-                        !StarDetectorSuppressLines( responses, sizes, maxPt, lineThresholdProjected,
-                            lineThresholdBinarized ))
-                {
+                if(!StarDetectorSuppressLines(responses, sizes, maxPt, lineThresholdProjected)) {
+                    featureSize = s_ptr[maxPt.y*sstep + maxPt.x];
                     KeyPoint kpt((float)maxPt.x, (float)maxPt.y, featureSize, -1, maxResponse);
                     keypoints.push_back(kpt);
                 }
             }
 skip_max:
-            if( minPt.x >= 0 )
-            {
-                for( y1 = minPt.y - delta; y1 <= minPt.y + delta; y1++ )
-                    for( x1 = minPt.x - delta; x1 <= minPt.x + delta; x1++ )
-                    {
+            if( minPt.x >= 0) {
+                //相邻两个预设窗口特征点可能靠在一起，这种情况下只保留一个最小响应特征。
+                for(y1 = minPt.y - delta; y1 <= minPt.y + delta; y1++) {
+                    for(x1 = minPt.x - delta; x1 <= minPt.x + delta; x1++) {
                         float val = r_ptr[y1*rstep + x1];
                         if( val <= minResponse && (y1 != minPt.y || x1 != minPt.x))
                             goto skip_min;
                     }
+                }
 
-                if( (featureSize = s_ptr[minPt.y*sstep + minPt.x]) >= 4 &&
-                        !StarDetectorSuppressLines( responses, sizes, minPt,
-                            lineThresholdProjected, lineThresholdBinarized))
-                {
+                if(!StarDetectorSuppressLines(responses, sizes, minPt, lineThresholdProjected)) {
+                    featureSize = s_ptr[minPt.y*sstep + minPt.x];
                     KeyPoint kpt((float)minPt.x, (float)minPt.y, featureSize, -1, maxResponse);
                     keypoints.push_back(kpt);
                 }
@@ -311,24 +285,30 @@ Mat MyStarTest::CornersShow(Mat src, vector<KeyPoint> corners) {
 }
 
 Mat MyStarTest::run(Mat src) {
+    //缩放尺度限制参数，本质上用不同半径的均值滤波来等效多次度。
+    //该参数实际上是直方图均值滤波允许的最大半径。
+    //内部代码有限制，缩放尺度不能超过12倍
     int maxSize = 45;
+
+    //响应阈值，响应分数低于该阈值的特征直接舍弃。
     int responseThreshold = 30;
+
+    //harris角点公式系数k
     int lineThresholdProjected = 10;
-    int lineThresholdBinarized = 8;
+
+    //特征间隔参数，在这个间隔范围之内，值保留最多2个(最大/最小响应分数)特征
     int suppressNonmaxSize = 5;
 
     Mat responses;
     Mat sizes;
-
     int border = StarDetectorComputeResponses(src, responses, sizes, maxSize);
-    cout << "border:" << border << endl;
+    imshow("responses", responses/255);
 
     vector<KeyPoint> keypoints;
-    if(border >= 0)
+    if(border >= 0) {
         StarDetectorSuppressNonmax(responses, sizes, keypoints, border,
-                responseThreshold, lineThresholdProjected,
-                lineThresholdBinarized, suppressNonmaxSize);
-
+                responseThreshold, lineThresholdProjected, suppressNonmaxSize);
+    }
     cout << "keypoints:" << keypoints.size() << endl;
 
     Mat dst = CornersShow(src, keypoints);

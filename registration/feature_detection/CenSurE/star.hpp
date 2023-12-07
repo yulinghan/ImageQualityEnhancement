@@ -26,11 +26,9 @@ class MyStarTest{
 
         void StarDetectorSuppressNonmax(Mat& responses, Mat& sizes,
                             vector<KeyPoint>& keypoints, int border,
-                            int responseThreshold, int lineThresholdProjected,
-                            int lineThresholdBinarized, int suppressNonmaxSize);
+                            int responseThreshold, int lineThresholdProjected, int suppressNonmaxSize);
 
-        bool StarDetectorSuppressLines(const Mat& responses, const Mat& sizes, Point pt,
-                                       int lineThresholdProjected, int lineThresholdBinarized);
+        bool StarDetectorSuppressLines(const Mat& responses, const Mat& sizes, Point pt, int lineThresholdProjected);
 
         Mat CornersShow(Mat src, vector<KeyPoint> corners);
 };
