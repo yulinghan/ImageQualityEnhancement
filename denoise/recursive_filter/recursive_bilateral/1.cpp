@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
     imshow("src", src);
 
     float sigma_spatial = 0.05;
-    float sigma_range  = 0.75;
+    float sigma_range  = 0.15;
 
 	MyRecursiveBilateral *my_bilateral_blur_test = new MyRecursiveBilateral();
     Mat bilateral_blur = my_bilateral_blur_test->Run(src, sigma_spatial, sigma_range);

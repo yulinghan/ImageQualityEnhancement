@@ -30,8 +30,8 @@ Mat MyRecursiveBilateral::BilateralFiltering(Mat src, double *range_table, float
             int dr = abs(ptr_src[j] - ptr_src[j-1]);
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
-            ptr_out1[j]    = ypr = (1.0 - alpha_) * ptr_src[j] + alpha_* ypr;
-            ptr_factor1[j] = fp = (1.0 - alpha_) + alpha_*fp;
+            ptr_out1[j]    = ypr = (1.0 - alpha) * ptr_src[j] + alpha_* ypr;
+            ptr_factor1[j] = fp = (1.0 - alpha) + alpha_*fp;
 
         }
         ypr = ptr_out1[src.cols-1] / ptr_factor1[src.cols-1];
@@ -44,8 +44,8 @@ Mat MyRecursiveBilateral::BilateralFiltering(Mat src, double *range_table, float
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
 
-            ptr_out2[j]    = ypr = (1.0 - alpha_) * ptr_src[j] + alpha_* ypr;
-            ptr_factor2[j] = fp = (1.0 - alpha_) + alpha_*fp;
+            ptr_out2[j]    = ypr = (1.0 - alpha) * ptr_src[j] + alpha_* ypr;
+            ptr_factor2[j] = fp = (1.0 - alpha) + alpha_*fp;
         }
     }
     
@@ -67,8 +67,8 @@ Mat MyRecursiveBilateral::BilateralFiltering(Mat src, double *range_table, float
             int dr = abs(src.at<uchar>(i, j) - src.at<uchar>(i-1, j));
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
-            out3.at<double>(i, j) = (1.0 - alpha_)*out2.at<double>(i, j) + alpha_* out3.at<double>(i-1, j);
-            factor_mat3.at<double>(i, j) = (1.0 - alpha_)*factor_mat2.at<double>(i, j) + alpha_* factor_mat3.at<double>(i-1, j);
+            out3.at<double>(i, j) = (1.0 - alpha)*out2.at<double>(i, j) + alpha_* out3.at<double>(i-1, j);
+            factor_mat3.at<double>(i, j) = (1.0 - alpha)*factor_mat2.at<double>(i, j) + alpha_* factor_mat3.at<double>(i-1, j);
         }
     }
 
@@ -77,8 +77,8 @@ Mat MyRecursiveBilateral::BilateralFiltering(Mat src, double *range_table, float
             int dr = abs(src.at<uchar>(i, j) - src.at<uchar>(i+1, j));
             double weight  = range_table[dr];
             double alpha_  = weight*alpha;
-            out4.at<double>(i, j) = (1.0 - alpha_)*out2.at<double>(i, j) + alpha_* out4.at<double>(i+1, j);
-            factor_mat4.at<double>(i, j) = (1.0 - alpha_)*factor_mat2.at<double>(i, j) + alpha_* factor_mat4.at<double>(i+1, j);
+            out4.at<double>(i, j) = (1.0 - alpha)*out2.at<double>(i, j) + alpha_* out4.at<double>(i+1, j);
+            factor_mat4.at<double>(i, j) = (1.0 - alpha)*factor_mat2.at<double>(i, j) + alpha_* factor_mat4.at<double>(i+1, j);
         }
     }
     
