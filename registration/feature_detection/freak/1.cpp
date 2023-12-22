@@ -29,6 +29,7 @@ int main(int argc, char* argv[]){
 
     MyFreakDescriptorsTest *my_freak_descriptors_test = new MyFreakDescriptorsTest();
     Mat descriptors = my_freak_descriptors_test->run(src_gray, corners);
+    cout << "descriptors:" << descriptors.size() << endl;
 
     waitKey(0);
 	return 0;

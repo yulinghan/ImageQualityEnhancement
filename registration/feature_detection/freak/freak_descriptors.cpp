@@ -26,9 +26,10 @@ void MyFreakDescriptorsTest::BuildPattern() {
     // sigma of pattern points (each group of 6 points on a concentric cirle has the same sigma)
     double sigma[8] = {radius[0]/2.0, radius[1]/2.0, radius[2]/2.0,
                         radius[3]/2.0, radius[4]/2.0, radius[5]/2.0,
-                        radius[6]/2.0, radius[6]/2.0
-    };
+                        radius[6]/2.0, radius[6]/2.0};
 
+    max_border = 0;
+    max_sigma = 0;
     // fill the lookup table
     for(int scaleIdx=0; scaleIdx < NB_SCALES; ++scaleIdx) {
         patternSizes[scaleIdx] = 0; // proper initialization
@@ -49,7 +50,16 @@ void MyFreakDescriptorsTest::BuildPattern() {
                     point.x = static_cast<float>(radius[i] * cos(alpha) * scalingFactor * patternScale);
                     point.y = static_cast<float>(radius[i] * sin(alpha) * scalingFactor * patternScale);
                     point.sigma = static_cast<float>(sigma[i] * scalingFactor * patternScale);
-
+        
+                    if(max_border < abs(point.x)) {
+                        max_border = abs(point.x);
+                    }
+                    if(max_border < abs(point.y)) {
+                        max_border = abs(point.y);
+                    }
+                    if(max_sigma < point.sigma) {
+                        max_sigma = point.sigma;
+                    }
                     // adapt the sizeList if necessary
                     const int sizeMax = static_cast<int>(ceil((radius[i]+sigma[i])*scalingFactor*patternScale)) + 1;
                     if(patternSizes[scaleIdx] < sizeMax) {
@@ -94,7 +104,7 @@ void MyFreakDescriptorsTest::BuildPattern() {
     vector<DescriptionPair> allPairs;
     for(int i = 1; i < NB_POINTS; ++i) {
         for(int j = 0; j < i; ++j) {
-            DescriptionPair pair = {(uchar)i,(uchar)j};
+            DescriptionPair pair = {i, j};
             allPairs.push_back(pair);
         }
     }
@@ -103,6 +113,23 @@ void MyFreakDescriptorsTest::BuildPattern() {
         descriptionPairs[i] = allPairs[DEF_PAIRS[i]];
     }
 }
+
+void MyFreakDescriptorsTest::extractDescriptor(int *pointsValue, void ** ptr) {
+    bitset<NB_PAIRS>** ptrScalar = (bitset<NB_PAIRS>**) ptr;
+
+    // extracting descriptor preserving the order of SSE version
+    int cnt = 0;
+    for( int n = 7; n < NB_PAIRS; n += 128) {
+        for( int m = 8; m--; ) {
+            int nm = n-m;
+            for(int kk = nm+15*8; kk >= nm; kk-=8, ++cnt) {
+                (*ptrScalar)->set(kk, pointsValue[descriptionPairs[cnt].i] >= pointsValue[descriptionPairs[cnt].j]);
+            }
+        }
+    }
+    --(*ptrScalar);
+}
+
 
 Mat MyFreakDescriptorsTest::ComputeDescriptors(Mat image, vector<Point> keypoints){
     Mat imgIntegral;
@@ -114,21 +141,32 @@ Mat MyFreakDescriptorsTest::ComputeDescriptors(Mat image, vector<Point> keypoint
     int direction0;
     int direction1;
 
+    for( size_t k = keypoints.size(); k--; ) {
+        int pattern = max_border + max_sigma;
+        if(keypoints[k].x <= pattern ||
+                keypoints[k].y <= pattern ||
+                keypoints[k].x >= image.cols - pattern ||
+                keypoints[k].y >= image.rows - pattern) {
+            keypoints.erase(kpBegin+k);
+        }
+    }
+
     Mat descriptors;
     // allocate descriptor memory, estimate orientations, extract descriptors
     if(!extAll) {
         // extract the best comparisons only
-        descriptors = Mat::zeros(Size((int)keypoints.size(), NB_PAIRS/8), CV_8U);
-        bitset<NB_PAIRS>* ptr = (bitset<NB_PAIRS>*) (descriptors.data+(keypoints.size()-1)*descriptors.step[0]);
+        descriptors = Mat::zeros(Size(NB_PAIRS/8, (int)keypoints.size()), CV_8U);
+        uchar *ptr = descriptors.ptr(0);
 
         for( size_t k = keypoints.size(); k--; ) {
             // estimate orientation (gradient)
-            // get the points intensity value in the un-rotated pattern
+            //每个特征的43个取值点作均值滤波
             for(int i = NB_POINTS; i--; ) {
                 pointsValue[i] = MeanIntensity(image, imgIntegral, keypoints[k].x, keypoints[k].y, 0, 0, i);
             }
             direction0 = 0;
             direction1 = 0;
+            //对长距离类的45个取值点对，计算特征主方向
             for(int m = 45; m--; ) {
                 //iterate through the orientation pairs
                 const int delta = (pointsValue[orientationPairs[m].i]-pointsValue[orientationPairs[m].j]);
@@ -147,22 +185,33 @@ Mat MyFreakDescriptorsTest::ComputeDescriptors(Mat image, vector<Point> keypoint
             }
 
             // extract descriptor at the computed orientation
+            //特征43个取值点，坐标根据主方向旋转后，作均值滤波
             for( int i = NB_POINTS; i--; ) {
                 pointsValue[i] = MeanIntensity(image, imgIntegral, keypoints[k].x, keypoints[k].y, 0, thetaIdx, i);
             }
 
-            for(int m = NB_PAIRS; m--; ) {
-                ptr->set(m, pointsValue[descriptionPairs[m].i]>  pointsValue[descriptionPairs[m].j ] );
+            //对预设的512个取值点对进行数据编码，得到64个uchar类似的特征描述
+            for( int n = 0; n < NB_PAIRS/8; n ++) {
+                int shifter = 0;
+                for( int m=0; m<8; m++) {
+                    int cnt = n*8 + m;
+                    int t1 = pointsValue[descriptionPairs[cnt].i];
+                    int t2 = pointsValue[descriptionPairs[cnt].j];
+                    if (t1 > t2) {
+                        *ptr |= ((1) << shifter);
+                    }
+                    ++shifter;
+                }
+                ptr++;
             }
-            --ptr;
         }
     } else {// extract all possible comparisons for selection
-        descriptors = Mat::zeros(Size((int)keypoints.size(), 128), CV_8U);
-        bitset<1024>* ptr = (bitset<1024>*) (descriptors.data+(keypoints.size()-1)*descriptors.step[0]);
+        descriptors = Mat::zeros(Size(128, (int)keypoints.size()), CV_8U);
 
-        for(size_t k = keypoints.size(); k--; ) {
-            //estimate orientation (gradient)
-            //get the points intensity value in the un-rotated pattern
+        for(size_t k = 0; k<keypoints.size(); k++) {
+            uchar *ptr = descriptors.ptr((int)k);
+
+            //特征点主方向计算
             for(int i = NB_POINTS;i--; ) {
                 pointsValue[i] = MeanIntensity(image, imgIntegral, keypoints[k].x,keypoints[k].y, 0, 0, i);
             }
@@ -185,22 +234,30 @@ Mat MyFreakDescriptorsTest::ComputeDescriptors(Mat image, vector<Point> keypoint
             if(thetaIdx >= NB_ORIENTATION) {
                 thetaIdx -= NB_ORIENTATION;
             }
-            // get the points intensity value in the rotated pattern
+
+            //特征43个采样点主方向旋转后，计算采样点均值滤波
             for(int i = NB_POINTS; i--; ) {
                 pointsValue[i] = MeanIntensity(image, imgIntegral, keypoints[k].x, keypoints[k].y, 0, thetaIdx, i);
             }
 
-            int cnt(0);
-            for(int i = 1; i < NB_POINTS; ++i) {
-                //(generate all the pairs)
-                for(int j = 0; j < i; ++j) {
-                    ptr->set(cnt, pointsValue[i] >= pointsValue[j] );
-                    ++cnt;
+            int shifter = 0;
+            for(int i=0; i<NB_POINTS; i++) {
+                for(int j=0; j<i; j++) {
+                        int t1 = pointsValue[i];
+                        int t2 = pointsValue[j];
+                        if(shifter == 8) {
+                            shifter = 0;
+                            ptr++;
+                        }
+                        if (t1 > t2) {
+                            *ptr |= ((1) << shifter);
+                        }
+                        shifter += 1;
                 }
             }
-            --ptr;
         }
     }
+
     return descriptors;
 }
 
@@ -252,8 +309,83 @@ int MyFreakDescriptorsTest::MeanIntensity(Mat image, Mat integral, float kp_x, f
     return ret_val;
 }
 
-Mat MyFreakDescriptorsTest::run(Mat src, vector<Point> key_points) {
-    Mat descriptors = ComputeDescriptors(src, key_points);       
+Mat MyFreakDescriptorsTest::SelectPairs(Mat src, vector<Point>& key_points, double corrTresh) {
+    extAll = true;
 
-    return descriptors;
+    // compute descriptors with all pairs
+    Mat descriptors = ComputeDescriptors(src, key_points);
+
+    //descriptor in floating point format (each bit is a float)
+    Mat descriptorsFloat = Mat::zeros(descriptors.rows, 903, CV_32F);
+
+    Mat new_descriptors = Mat::zeros(descriptors.rows, NB_PAIRS/8, CV_8U);;
+
+    bitset<1024>* ptr = (bitset<1024>*) (descriptors.data+(descriptors.rows-1)*descriptors.step[0]);
+    for(int m = descriptors.rows; m--; ) {
+        for( int n = 903; n--; ) {
+            if( ptr->test(n) == true ) {
+                descriptorsFloat.at<float>(m,n)=1.0f;
+            }
+        }
+        --ptr;
+    }
+
+    vector<PairStat> pairStat;
+    for(int n = 903; n--; ) {
+        // the higher the variance, the better --> mean = 0.5
+        PairStat tmp = { fabs( mean(descriptorsFloat.col(n))[0]-0.5 ) ,n};
+        pairStat.push_back(tmp);
+    }
+
+    sort(pairStat.begin(),pairStat.end(), sortMean());
+
+    vector<PairStat> bestPairs;
+    for(int m = 0; m < 903; ++m ) {
+        double corrMax(0);
+
+        for(size_t n = 0; n < bestPairs.size(); ++n) {
+            int idxA = bestPairs[n].idx;
+            int idxB = pairStat[m].idx;
+            double corr(0);
+            // compute correlation between 2 pairs
+            //直方图比较每列特征的相关性，如果新的这列和已选中的列相关性太高，表示以选中列中有类似特征表现，当前列抛弃。
+            //最终从903列中，保留最不相关的512列，进行特征降维度
+            corr = fabs(compareHist(descriptorsFloat.col(idxA), descriptorsFloat.col(idxB), HISTCMP_CORREL));
+
+            if(corr > corrMax) {
+                corrMax = corr;
+                if(corrMax >= corrTresh) {
+                    break;
+                }
+            }
+        }
+
+        if(corrMax < corrTresh) {
+            bestPairs.push_back(pairStat[m]);
+        }
+        if(bestPairs.size() >= NB_PAIRS) {
+            break;
+        }
+    }
+
+    for(int i=0; i<new_descriptors.rows; i++) {
+        for(int j=0; j<NB_PAIRS/8; j++) {
+            new_descriptors.at<uchar>(i, j) = descriptors.at<uchar>(i, bestPairs[i].idx);
+        }
+    }
+
+    return new_descriptors;
+}
+
+Mat MyFreakDescriptorsTest::run(Mat src, vector<Point> key_points) {
+
+    //903组采样点，随机选512组生成特征描述
+    Mat descriptors1 = ComputeDescriptors(src, key_points);
+
+    //903组采样点直接生成特征描述。
+    //相关性检测，去掉比较重复的特征描述维度，最终特征描述从903降维到512组
+    double corrTresh = 0.8;
+    Mat descriptors2 = SelectPairs(src, key_points, corrTresh);
+
+    return descriptors2;
 }

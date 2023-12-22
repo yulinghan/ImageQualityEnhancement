@@ -20,13 +20,13 @@ struct PatternPoint {
 };
 
 struct DescriptionPair {
-    uchar i; // index of the first point
-    uchar j; // index of the second point
+    int i; // index of the first point
+    int j; // index of the second point
 };
 
 struct OrientationPair {
-    uchar i; // index of the first point
-    uchar j; // index of the second point
+    int i; // index of the first point
+    int j; // index of the second point
     int weight_dx; // dx/(norm_sq))*4096
     int weight_dy; // dy/(norm_sq))*4096
 };
@@ -45,7 +45,7 @@ struct sortMean {
 const double SQRT2 = 1.4142135623731;
 const double INV_SQRT2 = 1.0 / SQRT2;
 const double LOG2 = 0.693147180559945;
-const int NB_SCALES = 64;
+const int NB_SCALES = 1;
 const int NB_ORIENTATION = 256;
 const int NB_POINTS = 43;
 const int NB_PAIRS = 512;
@@ -100,15 +100,18 @@ class MyFreakDescriptorsTest{
         int MeanIntensity(Mat image, Mat integral, float kp_x, float kp_y,
                         int scale, int rot, int point);
         Mat ComputeDescriptors(Mat image, vector<Point> keypoints);
+        void extractDescriptor(int *pointsValue, void ** ptr);
+        Mat SelectPairs(Mat image, vector<Point>& key_points, double corrTresh);
 
     private:
         bool orientationNormalized; //true if the orientation is normalized, false otherwise
         bool scaleNormalized; //true if the scale is normalized, false otherwise
         float patternScale; //scaling of the pattern
         int nOctaves;
-        bool extAll; // true if all pairs need to be extracted for pairs selection
+        bool extAll = false; // true if all pairs need to be extracted for pairs selection
         PatternPoint* patternLookup; // look-up table for the pattern points (position+sigma of all points at all scales and orientation)
         int patternSizes[NB_SCALES]; // size of the pattern at a specific scale (used to check if a point is within image boundaries)
         DescriptionPair descriptionPairs[NB_PAIRS];
         OrientationPair orientationPairs[NB_ORIENPAIRS];
+        int max_border, max_sigma;
 };
