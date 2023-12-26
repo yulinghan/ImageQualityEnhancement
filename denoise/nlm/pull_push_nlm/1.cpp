@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
 
     float h = 2.1;
     int halfKernelSize = 1;
-    int halfSearchSize = 3;
+    int halfSearchSize = 2;
 	MyPullPushNlmTest *my_pull_nlm_test = new MyPullPushNlmTest();
     my_pull_nlm_test->PullNlm(src, h, halfKernelSize, halfSearchSize);
 

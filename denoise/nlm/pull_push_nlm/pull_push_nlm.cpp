@@ -37,38 +37,43 @@ Mat MyPullPushNlmTest::DownFuse(Mat src, float h, int halfKernelSize, int halfSe
             Mat patchA = boardSrc(Range(j - halfKernelSize, j + halfKernelSize + 1), Range(i - halfKernelSize, i + halfKernelSize + 1));
             float w = 0;
             float value = 0;
-            float sumw = 0;
+            float sumw1 = 0;
+            float sumw2 = 0;
             float p = 0;
-            float w_arr[halfSearchSize*2+1][halfSearchSize*2+1];
+            float w_arr1[halfSearchSize*2+1][halfSearchSize*2+1];
+            float w_arr2[halfSearchSize*2+1][halfSearchSize*2+1];
 
             for (int sr = -halfSearchSize; sr <= halfSearchSize; sr++) {
                 for (int sc = -halfSearchSize; sc <= halfSearchSize; sc++) {
                     Mat patchB = boardSrc(Range(j + sr - halfKernelSize, j + sr + halfKernelSize + 1), Range(i + sc - halfKernelSize, i + sc + halfKernelSize + 1));
                     float d2 = MseBlock(patchA, patchB);
 
+                    w = exp(-d2 / h2);
+                    w_arr1[sr+halfSearchSize][sc+halfSearchSize] = w;
+                    sumw1 += w;
+
                     if(pull_weight_p_arr.size()>0) {
                         float p_weight = pull_weight_p_arr[pull_weight_p_arr.size()-1].at<float>(j - boardSize, i - boardSize);
-                        w = exp(-d2 / h2) * p_weight;
-                    } else {
-                        w = exp(-d2 / h2);
+                        w = w * p_weight;
                     }
-                    w_arr[sr+halfSearchSize][sc+halfSearchSize] = w;
-                    sumw += w;
+
+                    w_arr2[sr+halfSearchSize][sc+halfSearchSize] = w;
+                    sumw2 += w;
                 }
             }
 
             for (int sr = -halfSearchSize; sr <= halfSearchSize; sr++) {
                 uchar *boardSrc_p = boardSrc.ptr<uchar>(j + sr);
                 for (int sc = -halfSearchSize; sc <= halfSearchSize; sc++) {
-                    w_arr[sr+halfSearchSize][sc+halfSearchSize] = w_arr[sr+halfSearchSize][sc+halfSearchSize] / sumw;
-                    p += pow(w_arr[sr+halfSearchSize][sc+halfSearchSize], 2);
-                    value += boardSrc_p[i + sc] * w_arr[sr+halfSearchSize][sc+halfSearchSize];
+                    p += pow(w_arr1[sr+halfSearchSize][sc+halfSearchSize]/sumw1, 2);
+                    w_arr2[sr+halfSearchSize][sc+halfSearchSize] = w_arr2[sr+halfSearchSize][sc+halfSearchSize] / sumw2;
+                    value += boardSrc_p[i + sc] * w_arr2[sr+halfSearchSize][sc+halfSearchSize];
                 }
             }
             p = 1.0 / p;
+            dst_p[(i - boardSize)/2] = p;
 
             dst_out[(i - boardSize)/2] = fmin(fmax(value, 0.0), 255.0);
-            dst_p[(i - boardSize)/2] = p;
         }
     }
 
@@ -85,6 +90,9 @@ Mat MyPullPushNlmTest::UpFuse(Mat src_f, Mat src_c, float h, int halfKernelSize,
     copyMakeBorder(src_f, boardSrc_f, boardSize, boardSize, boardSize, boardSize, BORDER_REFLECT);   //边界扩展
     copyMakeBorder(src_c, boardSrc_c, boardSize, boardSize, boardSize, boardSize, BORDER_REFLECT);   //边界扩展
 
+    Mat Gaussian_src_c;
+    GaussianBlur(boardSrc_c, Gaussian_src_c, Size(3, 3), 0, 0);
+
     float h2 = h*h;
     int rows = src_f.rows;
     int cols = src_f.cols;
@@ -97,7 +105,7 @@ Mat MyPullPushNlmTest::UpFuse(Mat src_f, Mat src_c, float h, int halfKernelSize,
 
             int newj = (j-boardSize)/2 + boardSize;
             int newi = (i-boardSize)/2 + boardSize;
-            Mat patchA_c = boardSrc_c(Range(newj-halfKernelSize, newj+halfKernelSize+1), Range(newi-halfKernelSize, newi+halfKernelSize+1));
+            Mat patchA_c = Gaussian_src_c(Range(newj-halfKernelSize, newj+halfKernelSize+1), Range(newi-halfKernelSize, newi+halfKernelSize+1));
             float w = 0;
             float sumw = 0;
             float sumw2 = 0;
@@ -115,39 +123,41 @@ Mat MyPullPushNlmTest::UpFuse(Mat src_f, Mat src_c, float h, int halfKernelSize,
             }
 
             float w_arr2[halfSearchSize*2+1][halfSearchSize*2+1];
+            float w_arr3[halfSearchSize*2+1][halfSearchSize*2+1];
             for (int sr = -halfSearchSize; sr <= halfSearchSize; sr++) {
                 for (int sc = -halfSearchSize; sc <= halfSearchSize; sc++) {
-                    Mat patchB_c = boardSrc_c(Range(newj+sr-halfKernelSize, newj+sr+halfKernelSize+1), Range(newi+sc-halfKernelSize, newi+sc+halfKernelSize+1));
+                    Mat patchB_c = Gaussian_src_c(Range(newj+sr-halfKernelSize, newj+sr+halfKernelSize+1), Range(newi+sc-halfKernelSize, newi+sc+halfKernelSize+1));
                     float d2 = MseBlock(patchA_c, patchB_c);
+                    w = exp(-d2 / h2);
+                    w_arr3[sr+halfSearchSize][sc+halfSearchSize] = w;
+                    sumw2 += w;
+
                     if(push_weight_p_arr.size()>0) {
-                        float w_p = push_weight_p_arr[push_weight_p_arr.size()-1].at<float>((j-boardSize)/2, (i-boardSize)/2);
-//                        w_p = fmin(w_p-3.0, 0.0);
-                        w = exp(-d2 / h2);
-                    } else {
-                        w = exp(-d2 / h2);
+                        float p_value = push_weight_p_arr[push_weight_p_arr.size()-1].at<float>((j-boardSize)/2, (i-boardSize)/2);
+//                        p_value = fmin(p_value-3, 0.0);
+                        w = w * p_value;
                     }
                     w_arr2[sr+halfSearchSize][sc+halfSearchSize] = w;
-                    sumw += w;
-                    sumw2 += w;
+                    sumw  += w;
                 }
             }
 
             float value = 0;
-            float cur_p = 0;
+            float p_value = 0;
             for (int sr = -halfSearchSize; sr <= halfSearchSize; sr++) {
                 uchar *src_f_ptr = boardSrc_f.ptr(j + sr);
                 uchar *src_c_ptr = boardSrc_c.ptr(newj + sr);
 
                 for (int sc = -halfSearchSize; sc <= halfSearchSize; sc++) {
-                    cur_p += pow(w_arr2[sr+halfSearchSize][sc+halfSearchSize]/sumw2, 2);
+                    p_value += pow(w_arr3[sr+halfSearchSize][sc+halfSearchSize] / sumw2, 2);
                     w_arr1[sr+halfSearchSize][sc+halfSearchSize] = w_arr1[sr+halfSearchSize][sc+halfSearchSize] / sumw;
                     w_arr2[sr+halfSearchSize][sc+halfSearchSize] = w_arr2[sr+halfSearchSize][sc+halfSearchSize] / sumw;
                     value += src_f_ptr[i + sc]   * w_arr1[sr+halfSearchSize][sc+halfSearchSize];
                     value += src_c_ptr[newi + sc] * w_arr2[sr+halfSearchSize][sc+halfSearchSize];
                 }
             }
-            p_ptr[i - boardSize] = 1.0 / cur_p;
             dst_out[i - boardSize] = fmax(fmin(value, 255.0), 0.0);
+            p_ptr[i - boardSize] = 1.0/p_value;
         }
     }
 
@@ -158,8 +168,8 @@ Mat MyPullPushNlmTest::UpFuse(Mat src_f, Mat src_c, float h, int halfKernelSize,
 
 void MyPullPushNlmTest::PullNlm(Mat src, float h, int halfKernelSize, int halfSearchSize) {
     int num_layers = 4;
-    float cur_h1[4] = {5.1, 4.5, 4.6, 4.1};
-    float cur_h2[4] = {5.5, 4.5, 4.5, 4.5};
+    float cur_h1[4] = {5.7, 4.5, 3.8, 3.5};
+    float cur_h2[4] = {1.0, 1.0, 1.0, 1.0};
     pull_src_arr.clear();
 
     resize(src, src, (src.size()/2)*2);
@@ -182,4 +192,5 @@ void MyPullPushNlmTest::PullNlm(Mat src, float h, int halfKernelSize, int halfSe
         resize(y_mat, tmp, src.size(), 0, 0, INTER_NEAREST);
         imshow(format("new_mat_n_%d", i), tmp);
     }
+    imwrite("y_mat_2.png", y_mat);
 }
