@@ -31,7 +31,7 @@ class MyAkazeDescTest{
                                         vector<KeyPoint> key_points);
 
     private:
-        int descriptor_size_ = 128;
+        int descriptor_size_ = 64;
         int descriptor_type_ = CV_8UC1;
         int descriptor_pattern_size_ = 10;
 };
