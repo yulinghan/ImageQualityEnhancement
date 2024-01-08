@@ -13,8 +13,6 @@
 using namespace cv; 
 using namespace std;
 
-#define  CV_DESCALE(x,n)     (((x) + (1 << ((n)-1))) >> (n))
-
 class LKPyramid{
     public:
         LKPyramid();
