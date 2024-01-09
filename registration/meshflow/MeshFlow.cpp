@@ -28,7 +28,7 @@ void MeshFlow::SetFeature(vector<cv::Point2f> &spt, vector<cv::Point2f> &tpt){
 
 	//global outlier rejection
 	vector<int> mask;
-	m_globalHomography = cv::findHomography(spt, tpt, mask, cv::RANSAC);
+	m_globalHomography = findHomography(spt, tpt, mask, cv::RANSAC);
 
 	vector<cv::Point2f> spt_prune,tpt_prune;
 	for (int i = 0; i < mask.size(); i++){
@@ -44,12 +44,9 @@ void MeshFlow::SetFeature(vector<cv::Point2f> &spt, vector<cv::Point2f> &tpt){
 	n.location_x.resize(tpt_prune.size());
 	n.location_y.resize(tpt_prune.size());
 	for (int i = 0; i < tpt_prune.size(); i++){
-		if (tpt_prune[i].x<0 || tpt_prune[i].x>m_width - 1 || tpt_prune[i].y<0 || tpt_prune[i].y>m_height - 1)
-		{
+		if (tpt_prune[i].x<0 || tpt_prune[i].x>m_width - 1 || tpt_prune[i].y<0 || tpt_prune[i].y>m_height - 1) {
 			continue;
-		}
-		else
-		{
+		} else {
 			n.location_x[i] = tpt_prune[i].x / m_quadWidth;
 			n.location_y[i] = tpt_prune[i].y / m_quadHeight;
 			n.MeshMotions[n.location_x[i] + n.location_y[i] * m_divide_x].push_back(tpt_prune[i] - spt_prune[i]);
@@ -58,7 +55,6 @@ void MeshFlow::SetFeature(vector<cv::Point2f> &spt, vector<cv::Point2f> &tpt){
 }
 
 void MeshFlow::Execute(int radius){
-
 	DistributeMotion2MeshVertexes_MedianFilter();  //the first median filter
 	SpatialMedianFilter(radius); //the second median filter
 	WarpMeshbyMotion();
@@ -66,6 +62,7 @@ void MeshFlow::Execute(int radius){
 
 void MeshFlow::DistributeMotion2MeshVertexes_MedianFilter(){
 
+    //使用全局配准结果，对每个网格点进行图像配准，并保存配准偏移参数
 	for (int i = 0; i < m_meshheight; i++){
 		for (int j = 0; j < m_meshwidth; j++){
 			cv::Point2f pt = m_mesh->getVertex(i, j);
@@ -79,19 +76,14 @@ void MeshFlow::DistributeMotion2MeshVertexes_MedianFilter(){
 	motionx.resize(m_meshheight*m_meshwidth);
 	motiony.resize(m_meshheight*m_meshwidth);
 
-	//distribute features motion to mesh vertexes
+	//n.MeshMotions保存的是：落在对应网格里面中的所有待配准图像特征点，和它配对特征点的像素偏移。
+    //这里是扩大每个网格特征点收集范围：以当前特征点为中心，将周围5x5范围网格内的特征点全部整合到当前网格队列motionx/motiony中。
 	for (int i = 0; i < m_meshheight; i++){
 		for (int j = 0; j < m_meshwidth; j++){
-			cv::Point2f pt = m_mesh->getVertex(i, j);
-			
-			for (int mm = i - 2; mm <= i + 1; mm++)
-			{
-				for (int nn = j - 2; nn <= j + 1; nn++)
-				{
-					if (mm>=0&&nn>=0&&mm<m_meshheight-1&&nn<m_meshwidth-1)
-					{
-						for (int ii = 0; ii < n.MeshMotions[mm*m_divide_x + nn].size(); ii++)
-						{
+			for (int mm = i - 2; mm <= i + 1; mm++) {
+				for (int nn = j - 2; nn <= j + 1; nn++) {
+					if (mm>=0&&nn>=0&&mm<m_meshheight-1&&nn<m_meshwidth-1) {
+						for (int ii = 0; ii < n.MeshMotions[mm*m_divide_x + nn].size(); ii++) {
 							motionx[i*m_meshwidth + j].push_back(n.MeshMotions[mm*m_divide_x + nn][ii].x);
 							motiony[i*m_meshwidth + j].push_back(n.MeshMotions[mm*m_divide_x + nn][ii].y);
 						}
@@ -101,11 +93,18 @@ void MeshFlow::DistributeMotion2MeshVertexes_MedianFilter(){
 		}
 	}
 
+    //如果当前网格队列特征点数量大于4个。
+    //对motionx和motiony中的特征点偏移数据进行从小到大排序。
+    //取中间值保存到m_vertexMotion中。
+    //特别注意：m_vertexMotion在之前已经用全局配准数据赋值初始化过了。
+    //这里的实际意思是：如果当前网格内有大于4个特征点，那个就用特征点数据替换全局配准结果，如果没有，那个当前网格就用全局配准数据。
 	for (int i = 0; i < m_meshheight; i++){
 		for (int j = 0; j<m_meshwidth; j++){
 			if (motionx[i*m_meshwidth + j].size()>4){
+
 				myQuickSort(motionx[i*m_meshwidth + j], 0, motionx[i*m_meshwidth + j].size() - 1);
 				myQuickSort(motiony[i*m_meshwidth + j], 0, motiony[i*m_meshwidth + j].size() - 1);
+
 				m_vertexMotion[i*m_meshwidth + j].x = motionx[i*m_meshwidth + j][motionx[i*m_meshwidth + j].size() / 2];
 				m_vertexMotion[i*m_meshwidth + j].y = motiony[i*m_meshwidth + j][motiony[i*m_meshwidth + j].size() / 2];
 			}
@@ -122,6 +121,9 @@ void MeshFlow::SpatialMedianFilter(int radius){
 	}
 
 
+    //根据预设滤波半径radius。
+    //以当前网格点为中心，聚合半径范围内的特征偏移数据为列表。
+    //对列表根据特征偏移数据，从小到大排序，取中间值作为当前网格点特征偏移。
 	for (int i = 0; i < m_meshheight; i++){
 		for (int j = 0; j < m_meshwidth; j++){
 
@@ -146,6 +148,7 @@ void MeshFlow::SpatialMedianFilter(int radius){
 
 void MeshFlow::WarpMeshbyMotion(){
 
+    //将每个网格点偏移数据和原始坐标点相加，得到每个网格点真实位移数据
 	for (int i = 0; i < m_meshheight; i++){
 		for (int j = 0; j < m_meshwidth; j++){
 			cv::Point2f s = m_mesh->getVertex(i, j);
