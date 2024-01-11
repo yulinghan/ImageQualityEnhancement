@@ -1,7 +1,5 @@
 #include "dis.hpp"
 
-#define DEBUG 1
-
 MyDis::MyDis() {
     finest_scale = 2;
     coarsest_scale = 10;
@@ -171,16 +169,6 @@ void MyDis::prepareBuffers(Mat &I0, Mat &I1, Mat &flow) {
 
             Ux[i] = Mat::zeros(Size(cur_cols, cur_rows), CV_32FC1);
             Uy[i] = Mat::zeros(Size(cur_cols, cur_rows), CV_32FC1);
-
-#if DEBUG
-            Mat t1 = abs(I0xs[i]);
-            Mat t2 = abs(I0ys[i]);
-            t1.convertTo(t1, CV_8UC1);
-            t2.convertTo(t2, CV_8UC1);
-
-            imshow("I0xs", t1/4);
-            imshow("I0ys", t2/4);
-#endif
         }
         
         fraction *= 2;
@@ -284,7 +272,53 @@ void MyDis::precomputeStructureTensor(Mat &dst_I0xx, Mat &dst_I0yy, Mat &dst_I0x
     }
 }
 
-void MyDis::PatchInverseSearch_ParBody(int _nstripes, int _hs, Mat &dst_Sx, Mat &dst_Sy,
+float MyDis::computeSSDMeanNorm(uchar *I0_ptr, uchar *I1_ptr, int I0_stride, int I1_stride, float w00, float w01,
+                                float w10, float w11, int patch_sz) {
+    float sum_diff = 0.0f, sum_diff_sq = 0.0f;
+    float n = (float)patch_sz * patch_sz;
+    float diff;
+
+    for (int i = 0; i < patch_sz; i++) {
+        for (int j = 0; j < patch_sz; j++) {
+            diff = w00 * I1_ptr[i * I1_stride + j] + w01 * I1_ptr[i * I1_stride + j + 1] +
+                w10 * I1_ptr[(i + 1) * I1_stride + j] + w11 * I1_ptr[(i + 1) * I1_stride + j + 1] -
+                I0_ptr[i * I0_stride + j];
+
+            sum_diff += diff;
+            sum_diff_sq += diff * diff;
+        }
+    }
+    return sum_diff_sq - sum_diff * sum_diff / n;
+}
+
+float MyDis::processPatchMeanNorm(float &dst_dUx, float &dst_dUy, uchar *I0_ptr, uchar *I1_ptr, short *I0x_ptr,
+                                  short *I0y_ptr, int I0_stride, int I1_stride, float w00, float w01, float w10,
+                                  float w11, int patch_sz, float x_grad_sum, float y_grad_sum) {
+    float sum_diff = 0.0, sum_diff_sq = 0.0;
+    float sum_I0x_mul = 0.0, sum_I0y_mul = 0.0;
+    float n = (float)patch_sz * patch_sz;
+
+    float diff;
+    for (int i = 0; i < patch_sz; i++)
+        for (int j = 0; j < patch_sz; j++)
+        {
+            diff = w00 * I1_ptr[i * I1_stride + j] + w01 * I1_ptr[i * I1_stride + j + 1] +
+                w10 * I1_ptr[(i + 1) * I1_stride + j] + w11 * I1_ptr[(i + 1) * I1_stride + j + 1] -
+                I0_ptr[i * I0_stride + j];
+
+            sum_diff += diff;
+            sum_diff_sq += diff * diff;
+
+            sum_I0x_mul += diff * I0x_ptr[i * I0_stride + j];
+            sum_I0y_mul += diff * I0y_ptr[i * I0_stride + j];
+        }
+
+    dst_dUx = sum_I0x_mul - sum_diff * x_grad_sum / n;
+    dst_dUy = sum_I0y_mul - sum_diff * y_grad_sum / n;
+    return sum_diff_sq - sum_diff * sum_diff / n;
+}
+
+void MyDis::PatchInverseSearch_ParBody(int _hs, Mat &dst_Sx, Mat &dst_Sy,
                                     Mat &src_Ux, Mat &src_Uy, Mat &_I0, Mat &_I1,
                                     Mat &_I0x, Mat &_I0y, int _num_iter, int _pyr_level) {
     int psz = patch_size;
@@ -293,17 +327,17 @@ void MyDis::PatchInverseSearch_ParBody(int _nstripes, int _hs, Mat &dst_Sx, Mat 
     int bsz = border_size;
 
     /* Input dense flow */
-    float *Ux_ptr = Ux->ptr<float>();
-    float *Uy_ptr = Uy->ptr<float>();
+    float *Ux_ptr = src_Ux.ptr<float>();
+    float *Uy_ptr = src_Uy.ptr<float>();
 
     /* Output sparse flow */
-    float *Sx_ptr = Sx->ptr<float>();
-    float *Sy_ptr = Sy->ptr<float>();
+    float *Sx_ptr = dst_Sx.ptr<float>();
+    float *Sy_ptr = dst_Sy.ptr<float>();
 
-    uchar *I0_ptr = I0->ptr<uchar>();
-    uchar *I1_ptr = I1->ptr<uchar>();
-    short *I0x_ptr = I0x->ptr<short>();
-    short *I0y_ptr = I0y->ptr<short>();
+    uchar *I0_ptr = _I0.ptr<uchar>();
+    uchar *I1_ptr = _I1.ptr<uchar>();
+    short *I0x_ptr = _I0x.ptr<short>();
+    short *I0y_ptr = _I0y.ptr<short>();
 
     /* Precomputed structure tensor */
     float *xx_ptr = I0xx_buf.ptr<float>();
@@ -312,7 +346,6 @@ void MyDis::PatchInverseSearch_ParBody(int _nstripes, int _hs, Mat &dst_Sx, Mat 
     /* And extra buffers for mean-normalization: */
     float *x_ptr = I0x_buf.ptr<float>();
     float *y_ptr = I0y_buf.ptr<float>();
-    float *initial_Ux_ptr = NULL, *initial_Uy_ptr = NULL;
 
     int i, j, dir;
     int start_is, end_is, start_js, end_js;
@@ -340,20 +373,20 @@ void MyDis::PatchInverseSearch_ParBody(int _nstripes, int _hs, Mat &dst_Sx, Mat 
     dst = computeSSDMeanNorm(I0_ptr + i * w + j, I1_ptr + (int)i_I1 * w_ext + (int)j_I1, w, w_ext, w00,  \
                              w01, w10, w11, psz);                                                                  \
 
-    int num_inner_iter = (int)floor(grad_descent_iter / (float)num_iter);
-    for (int iter = 0; iter < num_iter; iter++) {
+    int num_inner_iter = (int)floor(grad_descent_iter / (float)_num_iter);
+    for(int iter = 0; iter < _num_iter; iter++) {
         if (iter % 2 == 0) {
             dir = 1;
-            start_is = min(range.start * stripe_sz, hs);
-            end_is = min(range.end * stripe_sz, hs);
+            start_is = 0;
+            end_is = hs;
             start_js = 0;
             end_js  = ws;
             start_i = start_is * patch_stride;
             start_j = 0;
         } else {
             dir = -1;
-            start_is = min(range.end * stripe_sz, hs) - 1;
-            end_is = min(range.start * stripe_sz, hs) - 1;
+            start_is = hs - 1;
+            end_is = -1;
             start_js = ws - 1;
             end_js = -1;
             start_i = start_is * patch_stride;
@@ -442,9 +475,95 @@ void MyDis::PatchInverseSearch_ParBody(int _nstripes, int _hs, Mat &dst_Sx, Mat 
             i += dir * patch_stride;
         }
     }
+
 #undef INIT_BILINEAR_WEIGHTS
 #undef COMPUTE_SSD
 }
+
+void MyDis::Densification_ParBody(int _h, Mat &dst_Ux, Mat &dst_Uy, 
+                                    Mat &src_Sx, Mat &src_Sy, Mat &_I0, Mat &_I1) {
+    int start_i = 0;
+    int end_i   = _h;
+
+    /* Input sparse flow */
+    float *Sx_ptr = src_Sx.ptr<float>();
+    float *Sy_ptr = src_Sy.ptr<float>();
+
+    /* Output dense flow */
+    float *Ux_ptr = dst_Ux.ptr<float>();
+    float *Uy_ptr = dst_Uy.ptr<float>();
+
+    uchar *I0_ptr = _I0.ptr<uchar>();
+    uchar *I1_ptr = _I1.ptr<uchar>();
+
+    int psz  = patch_size;
+    int pstr = patch_stride;
+    int i_l, i_u;
+    int j_l, j_u;
+    float i_m, j_m, diff;
+
+    /* These values define the set of sparse grid locations that contain patches overlapping with the current dense flow
+     * location */
+    int start_is, end_is;
+    int start_js, end_js;
+
+/* Some helper macros for updating this set of sparse grid locations */
+#define UPDATE_SPARSE_I_COORDINATES                                                                                    \
+    if (i % pstr == 0 && i + psz <= h)                                                                                 \
+        end_is++;                                                                                                      \
+    if (i - psz >= 0 && (i - psz) % pstr == 0 && start_is < end_is)                                                    \
+        start_is++;
+
+#define UPDATE_SPARSE_J_COORDINATES                                                                                    \
+    if (j % pstr == 0 && j + psz <= w)                                                                                 \
+        end_js++;                                                                                                      \
+    if (j - psz >= 0 && (j - psz) % pstr == 0 && start_js < end_js)                                                    \
+        start_js++;
+
+    start_is = 0;
+    end_is = -1;
+    for (int i = 0; i < start_i; i++) {
+        UPDATE_SPARSE_I_COORDINATES;
+    }
+
+    for (int i = start_i; i < end_i; i++) {
+        UPDATE_SPARSE_I_COORDINATES;
+        start_js = 0;
+        end_js = -1;
+        for (int j = 0; j < w; j++) {
+            UPDATE_SPARSE_J_COORDINATES;
+            float coef, sum_coef = 0.0f;
+            float sum_Ux = 0.0f;
+            float sum_Uy = 0.0f;
+
+            /* Iterate through all the patches that overlap the current location (i,j) */
+            for (int is = start_is; is <= end_is; is++) {
+                for (int js = start_js; js <= end_js; js++) {
+                    j_m = min(max(j + Sx_ptr[is * ws + js], 0.0f), w - 1.0f - EPS);
+                    i_m = min(max(i + Sy_ptr[is * ws + js], 0.0f), h - 1.0f - EPS);
+                    j_l = (int)j_m;
+                    j_u = j_l + 1;
+                    i_l = (int)i_m;
+                    i_u = i_l + 1;
+                    diff = (j_m - j_l) * (i_m - i_l) * I1_ptr[i_u * w + j_u] +
+                           (j_u - j_m) * (i_m - i_l) * I1_ptr[i_u * w + j_l] +
+                           (j_m - j_l) * (i_u - i_m) * I1_ptr[i_l * w + j_u] +
+                           (j_u - j_m) * (i_u - i_m) * I1_ptr[i_l * w + j_l] - I0_ptr[i * w + j];
+                    coef = 1 / max(1.0f, abs(diff));
+                    sum_Ux += coef * Sx_ptr[is * ws + js];
+                    sum_Uy += coef * Sy_ptr[is * ws + js];
+                    sum_coef += coef;
+                }
+            }
+            Ux_ptr[i*w+j] = sum_Ux / sum_coef;
+            Uy_ptr[i*w+j] = sum_Uy / sum_coef;
+
+        }
+    }
+#undef UPDATE_SPARSE_I_COORDINATES
+#undef UPDATE_SPARSE_J_COORDINATES
+}
+
 
 Mat MyDis::run(Mat src1, Mat src2) {
     Mat flow = Mat::zeros(src1.size(), CV_32FC2);
@@ -466,14 +585,12 @@ Mat MyDis::run(Mat src1, Mat src2) {
         //根据Ix, Iy梯度信息，计算Ix，Iy, Ix*Ix, Ix*Iy, Iy*Iy在patch_size*patch_size窗口中的梯度累加和。
         precomputeStructureTensor(I0xx_buf, I0yy_buf, I0xy_buf, I0x_buf, I0y_buf, I0xs[i], I0ys[i]);
         
-        parallel_for_(Range(0, 8), PatchInverseSearch_ParBody(*this, 8, hs, Sx, Sy, Ux[i], Uy[i], I0s[i],
-                    I1s_ext[i], I0xs[i], I0ys[i], 2, i));
+        PatchInverseSearch_ParBody(hs, Sx, Sy, Ux[i], Uy[i], I0s[i],
+                    I1s_ext[i], I0xs[i], I0ys[i], 2, i);
 
-        /*
-        parallel_for_(Range(0, num_stripes),
-                Densification_ParBody(*this, num_stripes, I0s[i].rows, Ux[i], Uy[i], Sx, Sy, I0s[i], I1s[i]));
-        if (variational_refinement_iter > 0)
-            variational_refinement_processors[i]->calcUV(I0s[i], I1s[i], Ux[i], Uy[i]);
+        Densification_ParBody(I0s[i].rows, Ux[i], Uy[i], Sx, Sy, I0s[i], I1s[i]);
+//        if (variational_refinement_iter > 0)
+//            variational_refinement_processors[i]->calcUV(I0s[i], I1s[i], Ux[i], Uy[i]);
 
         if(i>finest_scale) {
             resize(Ux[i], Ux[i - 1], Ux[i - 1].size());
@@ -481,13 +598,10 @@ Mat MyDis::run(Mat src1, Mat src2) {
             Ux[i - 1] *= 2;
             Uy[i - 1] *= 2;
         }
-        */
     }
-/*
     Mat uxy[] = {Ux[finest_scale], Uy[finest_scale]};
     merge(uxy, 2, U);
     resize(U, flow, flow.size());
     flow *= 1 << finest_scale;
-*/
     return flow;
 }

@@ -13,6 +13,9 @@
 using namespace cv; 
 using namespace std;
 
+#define EPS 0.001F
+#define INF 1E+10F
+
 class MyDis{
     public:
         MyDis();
@@ -23,6 +26,16 @@ class MyDis{
     private:
         void prepareBuffers(Mat &I0, Mat &I1, Mat &flow);
         void precomputeStructureTensor(Mat &dst_I0xx, Mat &dst_I0yy, Mat &dst_I0xy, Mat &dst_I0x, Mat &dst_I0y, Mat &I0x, Mat &I0y);
+        void PatchInverseSearch_ParBody(int _hs, Mat &dst_Sx, Mat &dst_Sy,
+                                    Mat &src_Ux, Mat &src_Uy, Mat &_I0, Mat &_I1,                                                                                                                          
+                                    Mat &_I0x, Mat &_I0y, int _num_iter, int _pyr_level);
+        float computeSSDMeanNorm(uchar *I0_ptr, uchar *I1_ptr, int I0_stride, int I1_stride, float w00, float w01,
+                                float w10, float w11, int patch_sz);
+        float processPatchMeanNorm(float &dst_dUx, float &dst_dUy, uchar *I0_ptr, uchar *I1_ptr, short *I0x_ptr,
+                                   short *I0y_ptr, int I0_stride, int I1_stride, float w00, float w01, float w10,
+                                   float w11, int patch_sz, float x_grad_sum, float y_grad_sum);
+        void Densification_ParBody(int _h, Mat &dst_Ux, Mat &dst_Uy,                                                                                                                                        
+                                    Mat &src_Sx, Mat &src_Sy, Mat &_I0, Mat &_I1);
 
     private:
         int finest_scale;
