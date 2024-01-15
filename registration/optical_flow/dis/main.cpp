@@ -18,7 +18,7 @@ int main(int argc, char* argv[]){
     Mat src1 = imread(argv[1]);
     Mat src2 = imread(argv[2]);
     
-    resize(src1, src1, src1.size()/4);
+    resize(src1, src1, src1.size()/8);
     resize(src2, src2, src1.size());
 
     Mat gray_src1, gray_src2;
@@ -29,6 +29,13 @@ int main(int argc, char* argv[]){
 
     MyDis *my_dis_test = new MyDis();
     Mat flow = my_dis_test->run(gray_src1, gray_src2);
+
+//    cv::Ptr<DenseOpticalFlow> algorithm = DISOpticalFlow::create(DISOpticalFlow::PRESET_ULTRAFAST);//PRESET_MEDIUM
+//    algorithm->calc(gray_src1, gray_src2, flow);
+
+    Mat flow_color;
+    my_dis_test->motionToColor(flow, flow_color);
+    imshow("flow_color", flow_color);
 
     vector<Mat> channels;
     split(flow, channels);

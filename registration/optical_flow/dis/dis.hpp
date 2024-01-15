@@ -15,6 +15,7 @@ using namespace std;
 
 #define EPS 0.001F
 #define INF 1E+10F
+#define UNKNOWN_FLOW_THRESH 1e9
 
 class MyDis{
     public:
@@ -22,7 +23,8 @@ class MyDis{
         ~MyDis();
 
         Mat run(Mat src1, Mat src2);
- 
+        void motionToColor(Mat flow, Mat &color);
+
     private:
         void prepareBuffers(Mat &I0, Mat &I1, Mat &flow);
         void precomputeStructureTensor(Mat &dst_I0xx, Mat &dst_I0yy, Mat &dst_I0xy, Mat &dst_I0x, Mat &dst_I0y, Mat &I0x, Mat &I0y);

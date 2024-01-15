@@ -16,6 +16,25 @@ MyDis::MyDis() {
 MyDis::~MyDis() {
 }
 
+
+void makecolorwheel(vector<Scalar> &colorwheel) {
+    int RY = 15;
+    int YG = 6;
+    int GC = 4;
+    int CB = 11;
+    int BM = 13;
+    int MR = 6;
+ 
+    int i;
+ 
+	for (i = 0; i < RY; i++) colorwheel.push_back(Scalar(255,	   255*i/RY,	 0));
+    for (i = 0; i < YG; i++) colorwheel.push_back(Scalar(255-255*i/YG, 255,		 0));
+    for (i = 0; i < GC; i++) colorwheel.push_back(Scalar(0,		   255,		 255*i/GC));
+    for (i = 0; i < CB; i++) colorwheel.push_back(Scalar(0,		   255-255*i/CB, 255));
+    for (i = 0; i < BM; i++) colorwheel.push_back(Scalar(255*i/BM,	   0,		 255));
+    for (i = 0; i < MR; i++) colorwheel.push_back(Scalar(255,	   0,		 255-255*i/MR));
+}
+
 template <typename T> static inline void spatialGradientKernel( T& vx, T& vy,
         const T& v00, const T& v01, const T& v02,
         const T& v10,               const T& v12,
@@ -399,32 +418,31 @@ void MyDis::PatchInverseSearch_ParBody(int _hs, Mat &dst_Sx, Mat &dst_Sy,
             for (int js = start_js; dir * js < dir * end_js; js += dir) {
                 if (iter == 0) {
                     /* Using result form the previous pyramid level as the very first approximation: */
-                    Sx_ptr[is * ws + js] = Ux_ptr[(i + psz2) * w + j + psz2];
-                    Sy_ptr[is * ws + js] = Uy_ptr[(i + psz2) * w + j + psz2];
+                    Sx_ptr[is * ws + js] = 0.0;
+                    Sy_ptr[is * ws + js] = 0.0;
                 }
 
                 float min_SSD = INF, cur_SSD;
                 COMPUTE_SSD(min_SSD, Sx_ptr[is * ws + js], Sy_ptr[is * ws + js]);
 
-                /* Try spatial candidates: */
-                if (dir * js > dir * start_js) {
-                    COMPUTE_SSD(cur_SSD, Sx_ptr[is * ws + js - dir], Sy_ptr[is * ws + js - dir]);
-                    if (cur_SSD < min_SSD) {
-                        min_SSD = cur_SSD;
-                        Sx_ptr[is * ws + js] = Sx_ptr[is * ws + js - dir];
-                        Sy_ptr[is * ws + js] = Sy_ptr[is * ws + js - dir];
+                {
+                    //每个点的当前层Ux,Uy，和它周围邻域Ux,Uy比较SSD，如果邻域SSD更低,那么使用邻域的Ux/Uy替换现有的Ux/Uy
+                    //该功能意义在于，有时候能改善一些光流局域错误。
+                    if (dir * js >= dir * start_js) {
+                        COMPUTE_SSD(cur_SSD, Sx_ptr[is * ws + js - dir], Sy_ptr[is * ws + js - dir]);
+                        if (cur_SSD < min_SSD) {
+                            min_SSD = cur_SSD;
+                            Sx_ptr[is * ws + js] = Sx_ptr[is * ws + js - dir];
+                            Sy_ptr[is * ws + js] = Sy_ptr[is * ws + js - dir];
+                        }
                     }
-                }
-                /* Flow vectors won't actually propagate across different stripes, which is the reason for keeping
-                 * the number of stripes constant. It works well enough in practice and doesn't introduce any
-                 * visible seams.
-                 */
-                if (dir * is > dir * start_is) {
-                    COMPUTE_SSD(cur_SSD, Sx_ptr[(is - dir) * ws + js], Sy_ptr[(is - dir) * ws + js]);
-                    if (cur_SSD < min_SSD) {
-                        min_SSD = cur_SSD;
-                        Sx_ptr[is * ws + js] = Sx_ptr[(is - dir) * ws + js];
-                        Sy_ptr[is * ws + js] = Sy_ptr[(is - dir) * ws + js];
+                    if (dir * is >= dir * start_is) {
+                        COMPUTE_SSD(cur_SSD, Sx_ptr[(is - dir) * ws + js], Sy_ptr[(is - dir) * ws + js]);
+                        if (cur_SSD < min_SSD) {
+                            min_SSD = cur_SSD;
+                            Sx_ptr[is * ws + js] = Sx_ptr[(is - dir) * ws + js];
+                            Sy_ptr[is * ws + js] = Sy_ptr[(is - dir) * ws + js];
+                        }
                     }
                 }
 
@@ -564,6 +582,64 @@ void MyDis::Densification_ParBody(int _h, Mat &dst_Ux, Mat &dst_Uy,
 #undef UPDATE_SPARSE_J_COORDINATES
 }
 
+
+void MyDis::motionToColor(Mat flow, Mat &color) {
+    if (color.empty())
+        color.create(flow.rows, flow.cols, CV_8UC3);
+
+    static vector<Scalar> colorwheel; //Scalar r,g,b
+    if (colorwheel.empty())
+        makecolorwheel(colorwheel);
+
+    // determine motion range:
+    float maxrad = -1;
+
+    // Find max flow to normalize fx and fy
+    for (int i= 0; i < flow.rows; ++i) {
+        for (int j = 0; j < flow.cols; ++j) {
+            Vec2f flow_at_point = flow.at<Vec2f>(i, j);
+            float fx = flow_at_point[0];
+            float fy = flow_at_point[1];
+            if ((fabs(fx) >  UNKNOWN_FLOW_THRESH) || (fabs(fy) >  UNKNOWN_FLOW_THRESH))
+                continue;
+            float rad = sqrt(fx * fx + fy * fy);
+            maxrad = maxrad > rad ? maxrad : rad;
+        }
+    }
+
+    for (int i= 0; i < flow.rows; ++i) {
+        for (int j = 0; j < flow.cols; ++j) {
+            uchar *data = color.data + color.step[0] * i + color.step[1] * j;
+            Vec2f flow_at_point = flow.at<Vec2f>(i, j);
+
+            float fx = flow_at_point[0] / maxrad;
+            float fy = flow_at_point[1] / maxrad;
+            if ((fabs(fx) >  UNKNOWN_FLOW_THRESH) || (fabs(fy) >  UNKNOWN_FLOW_THRESH)) {
+                data[0] = data[1] = data[2] = 0;
+                continue;
+            }
+            float rad = sqrt(fx * fx + fy * fy);
+
+            float angle = atan2(-fy, -fx) / CV_PI;
+            float fk = (angle + 1.0) / 2.0 * (colorwheel.size()-1);
+            int k0 = (int)fk;
+            int k1 = (k0 + 1) % colorwheel.size();
+            float f = fk - k0;
+            //f = 0; // uncomment to see original color wheel
+
+            for (int b = 0; b < 3; b++) {
+                float col0 = colorwheel[k0][b] / 255.0;
+                float col1 = colorwheel[k1][b] / 255.0;
+                float col = (1 - f) * col0 + f * col1;
+                if (rad <= 1)
+                    col = 1 - rad * (1 - col); // increase saturation with radius
+                else
+                    col *= .75; // out of range
+                data[2 - b] = (int)(255.0 * col);
+            }
+        }
+    }
+}
 
 Mat MyDis::run(Mat src1, Mat src2) {
     Mat flow = Mat::zeros(src1.size(), CV_32FC2);
