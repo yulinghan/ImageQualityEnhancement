@@ -52,7 +52,27 @@ Mat RawUtils::Rggb2Bayer(Mat rggb){
     return bayer;
 }
 
-Mat RawUtils::BlackSub(Mat rggb, int *black_level, int *white_level){
+Mat RawUtils::Bgr2Mosaicking(Mat bgr){
+    int height = bgr.rows;
+    int width = bgr.cols;
+    int chn = 4;
+    Mat bayer = Mat::zeros(height * 2, width * 2, CV_16UC1);
+    uint16_t* res = (uint16_t*)bayer.data;
+
+    for (int row = 0; row < height; row++) {
+        for (int col = 0; col < width; col++) {
+            int index = row * (width * chn) + col * chn;
+            res[(2 * row) * width * 2 + (2 * col)]         = bgr.at<ushort>(row, col*3+0);
+            res[(2 * row) * width * 2 + (2 * col + 1)]     = bgr.at<ushort>(row, col*3+1);
+            res[(2 * row + 1) * width * 2 + (2 * col)]     = bgr.at<ushort>(row, col*3+1);
+            res[(2 * row + 1) * width * 2 + (2 * col + 1)] = bgr.at<ushort>(row, col*3+2);
+        }
+    }
+
+    return bayer;
+}
+
+Mat RawUtils::SubBlack(Mat rggb, int *black_level, int *white_level){
     std::vector<cv::Mat> channels;
 
     rggb.convertTo(rggb, CV_32FC4);
@@ -67,6 +87,24 @@ Mat RawUtils::BlackSub(Mat rggb, int *black_level, int *white_level){
     merge(channels, rggb_black_sub);
 
     rggb_black_sub.setTo(0, rggb_black_sub < 0);
+    rggb_black_sub.convertTo(rggb_black_sub, CV_16UC4);
+
+    return rggb_black_sub;
+}
+
+Mat RawUtils::AddBlack(Mat rggb, int *black_level){
+    std::vector<cv::Mat> channels;
+
+    rggb.convertTo(rggb, CV_32FC4);
+    split(rggb, channels);
+
+    for(int i=0; i<4; i++) {
+        channels[i] = (channels[i] + black_level[i]);
+    }
+
+    Mat rggb_black_sub;
+    merge(channels, rggb_black_sub);
+
     rggb_black_sub.convertTo(rggb_black_sub, CV_16UC4);
 
     return rggb_black_sub;
