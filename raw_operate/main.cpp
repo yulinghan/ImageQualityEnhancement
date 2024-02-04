@@ -12,28 +12,6 @@
 #include <fstream>
 #include "utils.hpp"
 
-/*
-NumOfFrames:6
-EVType:0
-Gamma:2.2
-LuxIndex:285.634
-ISO:1208
-Shutter:40
-SensorTotalGain:12.0826
-IspDigGain:1.00035
-DRCGain:1.19405
-Pre_ISO:1208
-Pre_Shutter:40
-ColorTemperature:3585
-WbGain:1.32655,1,1.86722
-CCM:1,0,0,0,1,0,0,0,1
-BlackLevel:1023,1024,1024,1024
-Orientation:90
-BayerInfo(pattern:1, bitwidth:14)
-ImageSize(width:4064, height:3048, stride:4064, scanline:3048)
-ImageData(size:24774144, buf:0x743ec00000)
-*/
-
 using namespace cv;
 using namespace std;
 using namespace cv::ximgproc;
