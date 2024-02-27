@@ -36,6 +36,7 @@ test_loader = torch.utils.data.DataLoader(
                                ])), batch_size=1, shuffle=True)
 examples = enumerate(test_loader)
 batch_idx, (example_data, example_targets) = next(examples)
+#np.array(example_data).tofile('pic/' + str(np.array(example_targets)[0]) + '.raw')
 
 export_onnx_file = "Network.onnx"
 session = onnxruntime.InferenceSession(export_onnx_file,
