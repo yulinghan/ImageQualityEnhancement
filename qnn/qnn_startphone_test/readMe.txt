@@ -18,3 +18,6 @@ https://zhuanlan.zhihu.com/p/671145477
 https://zhuanlan.zhihu.com/p/671160585
 资料：https://blog.csdn.net/weixin_38498942/article/details/135278345 介绍了qnn工具常用命令细节。
 注意：xxx.tofile('xx.raw') 用来生成qnn测试时候需要的输入文件。
+
+
+source /opt/qcom/aistack/qnn/2.19.2.240210/bin/envsetup.sh
