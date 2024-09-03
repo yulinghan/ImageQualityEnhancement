@@ -52,9 +52,9 @@ void AshikhminTMO::AshikhminFiltering(Mat src_gray, Mat &L, Mat &Ldetail) {
 
         Mat cur_gauss_mat;
         GaussianBlur(src_gray, cur_gauss_mat, Size(blur_r*2+1, blur_r*2+1), 0, 0);
-        divide(cur_gauss_mat, L_filtered_arr[i], cur_gauss_mat);
 
         LC_arr[i] = abs(L_filtered_arr[i] - cur_gauss_mat);
+        divide(LC_arr[i], L_filtered_arr[i], LC_arr[i]);
     }
 
     float threshold = 0.5;
