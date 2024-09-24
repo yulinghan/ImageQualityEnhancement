@@ -9,7 +9,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/ximgproc.hpp>
 #include <stdio.h>
-#include "BanterleTMO.hpp"
+#include "BruceExpoBlendTMO.hpp"
 
 Mat read_raw(char* argv) {
     int height   = 384;//原始图像的高
@@ -30,13 +30,13 @@ Mat read_raw(char* argv) {
 }
 
 int main(int argc, char* argv[]) {
-
     Mat img = read_raw(argv[1]);
+    resize(img, img, img.size()/2);
     imshow("src", img);
 
-    BanterleTMO *my_tonemap_banterle_test = new BanterleTMO();
-    Mat out = my_tonemap_banterle_test->Run(img);
-    imshow("out", out*50);
+    BruceExpoBlendTMO *my_bruce_expo_blend_test = new BruceExpoBlendTMO();
+    Mat out = my_bruce_expo_blend_test->Run(img);
+    imshow("out", out);
     waitKey(0);
 
     imwrite(argv[2], out);

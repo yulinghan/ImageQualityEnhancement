@@ -1,214 +1,141 @@
-#include "BanterleTMO.hpp"
+#include "BruceExpoBlendTMO.hpp"
+#include <numeric>
 
-BanterleTMO::BanterleTMO() {
+BruceExpoBlendTMO::BruceExpoBlendTMO() {
 }
 
-BanterleTMO::~BanterleTMO() {
+BruceExpoBlendTMO::~BruceExpoBlendTMO() {
 }
 
-float BanterleTMO::sign(float x) {
-    if (x > 0) {
-        return 1;
-    } else if (x < 0) {
-        return -1;
-    } else {
-        return 0;
+vector<Mat> BruceExpoBlendTMO::CreateLDRStackFromHDR(Mat src) {
+    vector<float> light_ratio = {0.25, 0.5, 1.0, 2.0, 4.0};
+    //vector<float> light_ratio = {0.25, 1.0, 4.0};
+    vector<Mat> ldr_arr;
+
+    for(int i=0; i<light_ratio.size(); i++) {
+        Mat cur_src = src * light_ratio[i];
+        cur_src.setTo(0, cur_src<0);     
+        cur_src.setTo(1.0, cur_src>1.0);
+        ldr_arr.push_back(cur_src);
+
+        imshow(format("ldr_%d", i), cur_src);
     }
+
+    return ldr_arr;
 }
 
-void BanterleTMO::region_grow(Mat imgBin, int x, int y, int cur_value, vector<int> &addr_array_x, vector<int> &addr_array_y) {
-    int addrx, addry;
-    for(int i=x-1; i<x+2; i++) {
-        for(int j=y-1; j<y+2; j++) {
-            addrx = min(max(i, 0), imgBin.rows-1);
-            addry = min(max(j, 0), imgBin.cols-1);
-            if(imgBin.at<uchar>(addrx, addry) == cur_value) {
-                addr_array_x.push_back(addrx);
-                addr_array_y.push_back(addry);
-                imgBin.at<uchar>(addrx,addry) = 0;
+Mat entropyfilt(Mat logI) {
+    //生成滤波核
+    int R = 13;
+    int blockSize = 2*R+1;
+
+    uchar kernel[2*R+1][2*R+1];
+    for(int i=0; i<2*R+1; i++) {
+        for(int j=0; j<2*R+1; j++) {
+            int v = pow(i-R, 2) + pow(j-R, 2);
+            if(v<pow(R, 2)) {
+                kernel[i][j] = 255;
+            } else {
+                kernel[i][j] = 0;
             }
         }
     }
-}
+    Mat kernel_mask = Mat(blockSize, blockSize, CV_8UC1, kernel);
 
-Mat BanterleTMO::seg_area(Mat imgBin_ori, int &seg_num) {
-    Mat imgBin = imgBin_ori.clone();
+    Mat entropy_mat = Mat::zeros(logI.size(), CV_32FC1);
+    for(int x=R; x<logI.rows-R-1; x++) {
+        for(int y=R; y<logI.cols-R-1; y++) {
+            Mat block = logI(Rect(y-R, x-R, blockSize, blockSize)).clone();
+            block.setTo(0, kernel_mask);
+            block = block * 255;
+            block.convertTo(block, CV_8UC1);
 
-    Mat out = Mat::zeros(imgBin.size(), CV_8UC1);
-    vector<int> addr_array_x, addr_array_y;
-    int k = 0;
+            int histSize = 256;
+            float range[] = { 0,255 };
+            const float* histRanges = { range };
+            Mat hist_arr;
+            calcHist(&block, 1, 0, Mat(), hist_arr, 1, &histSize, &histRanges, true, false);
 
-    for(int i=0; i<out.rows; i++) {
-        for(int j=0; j<out.cols; j++) {
-            if(imgBin.at<uchar>(i,j) > 0) {
-                addr_array_x.clear();
-                addr_array_y.clear();
-                addr_array_x.push_back(i);
-                addr_array_y.push_back(j);
+            // 归一化直方图
+            for(int i=0; i<256; i++) {
+                hist_arr.at<float>(i, 0) = hist_arr.at<float>(i, 0) / (block.rows * block.cols);
+            }
 
-                int cur_value = imgBin.at<uchar>(i,j);
-                imgBin.at<uchar>(i,j) = 0;
-                k = 0;
-                while(k < (int)addr_array_x.size()) {
-                    region_grow(imgBin, addr_array_x[k], addr_array_y[k], cur_value, addr_array_x, addr_array_y);
-                    out.at<uchar>(addr_array_x[k], addr_array_y[k]) = seg_num;
-                    k += 1;
+            // 计算熵
+            float entropy = 0.0;
+            for (int i=0; i<256; i++) {
+                if (hist_arr.at<float>(i, 0) > 0) {
+                    entropy -= hist_arr.at<float>(i, 0) * std::log2(hist_arr.at<float>(i, 0));
                 }
-                seg_num += 1;
             }
+            entropy_mat.at<float>(x, y) = entropy;
         }
     }
+
+    return entropy_mat;
+}
+
+Mat BruceExpoBlendTMO::GetResult(vector<Mat> ldr_arr, Mat src) {
+    Mat totalE1 = Mat::zeros(ldr_arr[0].size(), CV_32FC1);
+    vector<Mat> H_local;
+    for(int i=0; i<ldr_arr.size(); i++) {
+        Mat logI;
+        log(ldr_arr[i]+1.0, logI);
+        Mat h_mat = entropyfilt(logI);
+        totalE1 = totalE1 + h_mat;
+        H_local.push_back(h_mat);
+        
+        cout << "entropyfilt:" << i << endl;
+    }
+
+    float beb_beta = 6;
+    Mat totalE2 = Mat::zeros(ldr_arr[0].size(), CV_32FC1);
+    for(int i=0; i<ldr_arr.size(); i++) {
+        Mat h_norm;
+        divide(H_local[i], totalE1, h_norm);
+        exp(beb_beta * h_norm, H_local[i]);
+        totalE2 = totalE2 + H_local[i];
+
+        cout << "totalE2:" << i << endl;
+    }
+
+
+    Mat out = Mat::zeros(ldr_arr[0].size(), CV_32FC3);
+    for(int i=0; i<ldr_arr.size(); i++) {
+        Mat h_norm;
+        divide(H_local[i], totalE2, h_norm);
+
+        vector<Mat> channels;
+        split(src, channels);
+
+        for(int c=0; c<3; c++) {
+            log(channels[c]+1.0, channels[c]);
+            channels[c] = channels[c].mul(h_norm);
+        }
+
+        Mat logI;
+        merge(channels, logI);
+
+        out = out + logI;
+        cout << "out:" << i << endl;
+    }
+
+    exp(out, out);
+    double minValue, maxValue;    // 最大值，最小值
+    minMaxLoc(out, &minValue, &maxValue, NULL, NULL);
+
+    out = (out - minValue) / (maxValue - minValue);
+
     return out;
 }
 
-vector<int> BanterleTMO::GetSegAreaNum(Mat seg_mat, int seg_num) {
-    vector<int> seg_pixel_num;
-    seg_pixel_num.resize(seg_num);
-
-    for(int i=0; i<seg_mat.rows; i++) {
-        for(int j=0; j<seg_mat.cols; j++) {
-            seg_pixel_num[seg_mat.at<uchar>(i, j)] +=1;
-        }
-    }
-
-    return seg_pixel_num;
-}
-
-Mat BanterleTMO::GetHdrSeg(Mat src_blur) {
-    double minValue, maxValue;    // 最大值，最小值
-    cv::minMaxLoc(src_blur, &minValue, &maxValue, NULL, NULL);
-    cout << "最大值：" << maxValue <<"最小值："<<minValue<<std::endl;
-
-    float l10Min = log10(minValue);
-    float l10Max = log10(maxValue);
-    cout << "1 l10Min:" << l10Min << ", l10Max:" << l10Max << endl;
-
-    float sMin = sign(l10Min);
-    float sMax = sign(l10Max);
-    cout << "sMin:" << sMin << ", sMax:" << sMax << endl;
-
-    if(sMin > 0) {
-        l10Min = sMin * floor(abs(l10Min));
-    } else {
-        l10Min = sMin * ceil(abs(l10Min));
-    }
-
-    if(sMax > 0) {
-        l10Max = sMax * ceil(abs(l10Max));
-    } else {
-        l10Max = sMax * floor(abs(l10Max));
-    }
-    cout << "2 l10Min:" << l10Min << ", l10Max:" << l10Max << endl;
-
-    Mat imgBin = Mat::zeros(src_blur.size(), CV_8UC1);
-    float nLevels = l10Max - l10Min + 1;
-    cout << "nLevels:" << nLevels << endl;
-
-    for(int i=l10Min; i<l10Max; i++) {
-        float bMin = pow(10, i);
-        float bMax = pow(10, i + 1);
-
-        Mat cur_mask = Mat::zeros(src_blur.size(), CV_8UC1);
-        cur_mask.setTo(255, src_blur >= bMin);
-        cur_mask.setTo(0,   src_blur >= bMax);
-
-        imgBin.setTo(i - l10Min + 1, cur_mask);
-    }
-
-    return imgBin;
-}
-    
-vector<vector<int>> BanterleTMO::GetSegNeighbor(Mat seg_mat, int seg_num) {
-    vector<vector<int>> seg_neighbor_arr2;
-    for(int i=0; i<seg_num; i++) {
-        vector<int> seg_neighbor_arr;
-        seg_neighbor_arr.resize(seg_num);
-        seg_neighbor_arr2.push_back(seg_neighbor_arr);
-    }
-
-    for(int k=0; k<seg_num; k++) {
-        for(int i=1; i<seg_mat.rows-1; i++) {
-            for(int j=1; j<seg_mat.cols-1; j++) {
-                if(seg_mat.at<uchar>(i, j) == k) {
-                    if(seg_mat.at<uchar>(i, j-1) != k) {
-                        seg_neighbor_arr2[k][seg_mat.at<uchar>(i, j-1)] = 1;
-                    }
-                    if(seg_mat.at<uchar>(i, j+1) != k) {
-                        seg_neighbor_arr2[k][seg_mat.at<uchar>(i, j+1)] = 1;
-                    } 
-                    if(seg_mat.at<uchar>(i-1, j) != k) {
-                        seg_neighbor_arr2[k][seg_mat.at<uchar>(i-1, j)] = 1;
-                    } 
-                    if(seg_mat.at<uchar>(i+1, j) != k) {
-                        seg_neighbor_arr2[k][seg_mat.at<uchar>(i+1, j)] = 1;
-                    } 
-                }
-            }
-        }
-    }
-    return seg_neighbor_arr2;
-}
-
-Mat BanterleTMO::GetSegMerge(Mat seg_mat, int seg_num, float thres, vector<int> seg_pixel_num, vector<vector<int>> seg_neighbor_arr2) {
-    float thres_num = seg_mat.rows * seg_mat.cols * thres;
-
-    for(int i=0; i<seg_num; i++) {
-        if(seg_pixel_num[i]<thres_num) {
-            int max_neigh = 0;
-            for(int j=0; j<seg_num; j++) {
-                if(seg_neighbor_arr2[i][j]>0 && seg_pixel_num[max_neigh]<seg_pixel_num[j]) {
-                    max_neigh = j;
-                }
-            }
-
-            seg_mat.setTo(max_neigh, seg_mat == i);
-        }
-    }
-
-    return seg_mat;
-}
-
-vector<int> BanterleTMO::GetHdrToMergeNum(Mat seg_mat, Mat imgBin, int seg_num) {
-    vector<int> hdrseg_merge_arr;
-    hdrseg_merge_arr.resize(seg_num);
-
-    for(int i=0; i<seg_mat.rows; i++) {
-        for(int j=0; j<seg_mat.rows; j++) {
-            hdrseg_merge_arr[seg_mat.at<uchar>(i, j)] = imgBin.at<uchar>(i, j);
-        }
-    }
-
-    return hdrseg_merge_arr;
-}
-
-Mat BanterleTMO::Run(Mat src) {
+Mat BruceExpoBlendTMO::Run(Mat src) {
     Mat src_gray;
     cvtColor(src, src_gray, COLOR_BGR2GRAY);
 
-    Mat src_blur;
-    GaussianBlur(src_gray, src_blur, Size(3, 3), 0, 0);
-
-    Mat imgBin = GetHdrSeg(src_blur);
-    imshow("imgBin", imgBin*50);
-
-    int seg_num = 0;
-    Mat seg_mat = seg_area(imgBin, seg_num);
-    imshow("seg_mat", seg_mat*10);
-    cout << "seg_num:" << seg_num <<  endl;
-
-    vector<int> hdrseg_merge_arr = GetHdrToMergeNum(seg_mat, imgBin, seg_num);
-
-    vector<int> seg_pixel_num = GetSegAreaNum(seg_mat, seg_num);
-    vector<vector<int>> seg_neighbor_arr2 = GetSegNeighbor(seg_mat, seg_num);
-
-    float thres = 0.005;
-    Mat seg_merge = GetSegMerge(seg_mat, seg_num, thres, seg_pixel_num, seg_neighbor_arr2);
-    imshow("seg_merge", seg_merge*50);
-
-    Mat out = Mat::zeros(seg_merge.size(), CV_8UC1);
-    for(int i=0; i<hdrseg_merge_arr.size(); i++) {
-        out.setTo(hdrseg_merge_arr[i], seg_merge==i);
-    }
+    vector<Mat> ldr_arr = CreateLDRStackFromHDR(src_gray);
     
+    Mat out = GetResult(ldr_arr, src);
+
     return out;
 }
