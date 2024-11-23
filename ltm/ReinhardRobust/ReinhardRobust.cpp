@@ -154,11 +154,13 @@ Mat ReinhardRobust::Run(Mat src) {
     cout << "log2Max:" << log2Max << ", log2Min:" << log2Min << endl;
 
     Mat out;
-    if(log2Max - log2Min > 11) {
+//    if(log2Max - log2Min > 11) {
         out = ReinhardLTM(src_gray);
-    } else {
-        out = ReinhardGTM(src_gray);
-    }
+//    } else {
+//        out = ReinhardGTM(src_gray);
+//    }
+
+    out = ChangeLuminance(src, out, src_gray);
 
     return out;
 }
