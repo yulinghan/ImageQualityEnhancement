@@ -19,7 +19,7 @@ class GdHdrTMO{
         GdHdrTMO();
         ~GdHdrTMO();
 
-		Mat Run(Mat src, float alpha, float beta, float scale);
+		Mat Run(Mat src, float alpha, float beta);
 
     private:
         vector<Mat> BuildGaussianPy(Mat pImage);
@@ -35,5 +35,4 @@ class GdHdrTMO{
     private:
         float m_alpha;
         float m_beta;
-        float m_scale;
 };

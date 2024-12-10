@@ -193,10 +193,9 @@ Mat GdHdrTMO::FFTCalcu(Mat div_g) {
     return outLuma;
 }
 
-Mat GdHdrTMO::Run(Mat src_rgb, float alpha, float beta, float scale) {
+Mat GdHdrTMO::Run(Mat src_rgb, float alpha, float beta) {
     m_alpha = alpha;
     m_beta  = beta;
-    m_scale = scale;
 
     Mat src_gray;
     cvtColor(src_rgb, src_gray, COLOR_BGR2GRAY);

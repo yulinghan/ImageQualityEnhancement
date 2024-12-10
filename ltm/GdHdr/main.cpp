@@ -34,11 +34,10 @@ int main(int argc, char* argv[]) {
     resize(img, img, img.size()/2);
     imshow("src", img);
 
-    float alpha = 0.82;
-    float beta  = 0.87;
-	float scale = 0.55;
+    float alpha = 0.10;
+    float beta  = 0.99;
     GdHdrTMO *my_gdhdr_test = new GdHdrTMO();
-    Mat out = my_gdhdr_test->Run(img, alpha, beta, scale);
+    Mat out = my_gdhdr_test->Run(img, alpha, beta);
     imshow("out", out);
     waitKey(0);
 
