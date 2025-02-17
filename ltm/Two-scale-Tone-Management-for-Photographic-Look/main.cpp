@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
 
     TwoScalePhotoGraphic *my_photoGraphic_test = new TwoScalePhotoGraphic();
     Mat out = my_photoGraphic_test->Run(src, ref);
-//    imshow("out", out);
+    imshow("out", out);
     waitKey(0);
 
     return 0;
