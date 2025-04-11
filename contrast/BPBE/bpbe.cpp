@@ -52,12 +52,10 @@ Mat EqualizeHistManual(Mat src) {
 
     for (int i = 0; i < mean_value; ++i) {
         cdf1[i] = cdf1[i] / num1;
-        cout << "cdf[" << i << "]:" << cdf1[i] * mean_value << endl;
     }
 
     for (int i = mean_value; i < histSize; ++i) {
         cdf2[i-mean_value] = cdf2[i-mean_value] / num2;
-        cout << "cdf[" << i << "]:" << cdf2[i-mean_value] << endl;
     }
 
     // 映射灰度级
